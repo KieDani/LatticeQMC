@@ -60,5 +60,11 @@ class Hamiltonian:
         print(K)
 
 
-    def buildV_sigma(self):
-        pass
+    #l is the aktual time slice; conf is the configuration of the H-S-Spins (array, not Object)
+    def buildV_l(self, l, config):
+        N = self.L**self.dim
+        V_l = np.zeros((N,N))
+        #Spins at time slice l
+        h = config[:,l]
+        for i in range(0,N):
+            V_l[i,i] = h[i]
