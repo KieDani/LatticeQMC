@@ -24,10 +24,10 @@ class Hamiltonian:
             sites.append(i)
         edges.append([L-1,0])
         sites.append(L-1)
-        print(edges)
-        print(edges[2])
-        print(len(edges))
-        print(sites)
+        #print(edges)
+        #print(edges[2])
+        #print(len(edges))
+        #print(sites)
         graph = (edges, sites)
         return graph
 
@@ -46,7 +46,7 @@ class Hamiltonian:
         U = self.U
         mu = self.mu
         t = self.t
-        K = np.zeros((N,N))#, dtype=np.int64)
+        K = np.zeros((N,N), dtype=np.float64)
         #hopping
         for i in range(0,len(edges)):
             tmp  = edges[i]
@@ -57,7 +57,7 @@ class Hamiltonian:
             tmp  = sites[i]
             K[tmp, tmp] = U/2 - mu
             K[tmp, tmp] = U / 2 - mu
-        print(K)
+        return K
 
 
     #l is the aktual time slice; conf is the configuration of the H-S-Spins (array, not Object)
@@ -68,3 +68,4 @@ class Hamiltonian:
         h = config[:,l]
         for i in range(0,N):
             V_l[i,i] = h[i]
+        return V_l
