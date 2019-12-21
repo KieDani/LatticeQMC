@@ -8,6 +8,7 @@ class Configuration:
 
     #N...number lattice sites; T...number time slices (per site)
     def __init__(self, N, T):
+        np.random.seed(123)
         self.N = N
         self.T = T
         self.config = np.zeros((N,T), dtype=np.int8)
