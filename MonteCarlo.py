@@ -13,10 +13,12 @@ T = 100.
 beta = 1/T
 stepsize = 20
 deltaTau = T/stepsize
-U = 2
+U = 5
 t = 1
 mu = 2
+#Unterschied zwischen Vorlesung und Paper
 v = np.arccosh(np.exp(U*deltaTau/2.))
+#v = np.exp(U*deltaTau/2.)
 C1 = 0.5*np.exp(-1*U*deltaTau/4.)
 ha = Ha.Hamiltonian(L=L, U=U, mu=mu, t=t)
 #conf is Object, config is array
@@ -72,6 +74,17 @@ def computeM_sigma(sigma, config):
 
 
 
+def computeG_sigma(sigma, M_sigma):
+    return np.linalg.inv(M_sigma)
+
+#Probability of acceptance of a spinfilp at site i and time l
+def computeProbability(i, l, G_up, G_down, config):
+    #look at definition of v again
+    d_up = 1+(1-G_up[i,i])*(np.exp(-2*v*config[i,l])-1)
+    d_down = 1+(1-G_down[i,i])*(np.exp(2*v*config[i,l])-1)
+    return d_up+d_down
+
+
 
 
 
@@ -82,12 +95,12 @@ def computeM_sigma(sigma, config):
 
 
 config = conf.get()
-x = computeM_sigma(sigma=1, config=config)
-#a = np.linalg.det(computeM_sigma(sigma=+1, config=config))*np.linalg.det(computeM_sigma(sigma=-1, config=config))
+#x = computeM_sigma(sigma=1, config=config)
+a = np.linalg.det(computeM_sigma(sigma=+1, config=config))*np.linalg.det(computeM_sigma(sigma=-1, config=config))
 #print(np.linalg.det(computeM_sigma(sigma=-1, config=config)))
-conf.update(2,7)
+conf.update(1,16)
 config = conf.get()
-#b = np.linalg.det(computeM_sigma(sigma=+1, config=config))*np.linalg.det(computeM_sigma(sigma=-1, config=config))
-y= computeM_sigma(sigma=1, config = config)
-#print(b/a)
-print(x-y)
+b = np.linalg.det(computeM_sigma(sigma=+1, config=config))*np.linalg.det(computeM_sigma(sigma=-1, config=config))
+#y= computeM_sigma(sigma=1, config = config)
+print(b/a)
+#print(x-y)
