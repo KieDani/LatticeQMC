@@ -57,15 +57,20 @@ class Hamiltonian:
             tmp  = sites[i]
             K[tmp, tmp] = U/2 - mu
             K[tmp, tmp] = U / 2 - mu
+
+        #print('K = ')
+        #print(K)
         return K
 
 
     #l is the aktual time slice; conf is the configuration of the H-S-Spins (array, not Object)
     def buildV_l(self, l, config):
         N = self.L**self.dim
-        V_l = np.zeros((N,N))
+        V_l = np.zeros((N,N), dtype=np.int8)
         #Spins at time slice l
         h = config[:,l]
         for i in range(0,N):
             V_l[i,i] = h[i]
+        #print('V_' + str(l) + ' = ')
+        #print(V_l)
         return V_l

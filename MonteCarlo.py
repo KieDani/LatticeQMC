@@ -5,13 +5,13 @@ import configuration
 import Hamiltonian as Ha
 
 
-L=3
+L=5
 dim = 1
 N = L**dim
-T = 100.
+T = 5.
 #no k_B used yet
 beta = 1/T
-stepsize = 20
+stepsize = 200
 deltaTau = T/stepsize
 U = 5
 t = 1
@@ -53,6 +53,8 @@ def computeB_lsigma(l, sigma, config):
     #don't know, if I have to use np.dot or elementwise *
     B = mult(tmp1, tmp2)
     #print(B)
+    #print('B_'+str(l)+str(sigma))
+    #print(B)
     return B
 
 
@@ -61,21 +63,32 @@ def computeM_sigma(sigma, config):
     M = np.zeros((N,N), dtype=np.float64)
     for i in range(1,N):
         M[i,i] = 1.
-    Bs = computeB_lsigma(l=0, sigma=sigma, config=config)
-    for l in range(1, stepsize):
-        B = computeB_lsigma(l=l, sigma=sigma, config=config)
-        #don't know if I have to use dot or elementwise *
-        Bs = mult(B, Bs)
+    # Bs = computeB_lsigma(l=0, sigma=sigma, config=config)
+    # for l in range(1, stepsize):
+    #     B = computeB_lsigma(l=l, sigma=sigma, config=config)
+    #     #don't know if I have to use dot or elementwise *
+    #     Bs = mult(B, Bs)
+    lmax = stepsize-1
+    Bs = computeB_lsigma(l=lmax, sigma=sigma, config=config)
+    lmax -= 1
+    while(lmax >= 0):
+        B = computeB_lsigma(l=lmax, sigma=sigma, config=config)
+        Bs = mult(Bs, B)
+        lmax -= 1
     M = M + Bs
+    print('Determinante ' + str(sigma))
     print(np.linalg.det(M))
-    print(M)
+    #print(M)
     return M
 
 
 
 
 def computeG_sigma(sigma, M_sigma):
-    return np.linalg.inv(M_sigma)
+    G = np.linalg.inv(M_sigma)
+    print('G_'+ str(sigma))
+    print(G)
+    return G
 
 #Probability of acceptance of a spinfilp at site i and time l
 def computeProbability(i, l, G_up, G_down, config):
@@ -93,14 +106,34 @@ def computeProbability(i, l, G_up, G_down, config):
 #computeM_sigma(1,config)
 
 
+def computeProbability_determinants():
+    conf = configuration.Configuration(N=N, T=stepsize, seed=1234)
+    config = conf.get()
+    #x = computeM_sigma(sigma=1, config=config)
+    a = np.linalg.det(computeM_sigma(sigma=+1, config=config))*np.linalg.det(computeM_sigma(sigma=-1, config=config))
+    #print(np.linalg.det(computeM_sigma(sigma=-1, config=config)))
+    conf.update(1,34)
+    config = conf.get()
+    b = np.linalg.det(computeM_sigma(sigma=+1, config=config))*np.linalg.det(computeM_sigma(sigma=-1, config=config))
+    #y= computeM_sigma(sigma=1, config = config)
+    print('Ergebnis')
+    print(b/a)
+    #print(x-y)
 
-config = conf.get()
-#x = computeM_sigma(sigma=1, config=config)
-a = np.linalg.det(computeM_sigma(sigma=+1, config=config))*np.linalg.det(computeM_sigma(sigma=-1, config=config))
-#print(np.linalg.det(computeM_sigma(sigma=-1, config=config)))
-conf.update(1,16)
-config = conf.get()
-b = np.linalg.det(computeM_sigma(sigma=+1, config=config))*np.linalg.det(computeM_sigma(sigma=-1, config=config))
-#y= computeM_sigma(sigma=1, config = config)
-print(b/a)
-#print(x-y)
+
+computeProbability_determinants()
+
+def computeProbability_intelligent():
+    conf = configuration.Configuration(N=N, T=stepsize, seed=1234)
+    config = conf.get()
+    M_up = computeM_sigma(sigma=+1, config=config)
+    M_down = computeM_sigma(sigma=-1, config=config)
+    G_up = computeG_sigma(sigma=+1,M_sigma=M_up)
+    G_down = computeG_sigma(sigma=-1, M_sigma=M_down)
+    i = 1
+    l = 34
+    p = computeProbability(i=i, l=l, G_up=G_up, G_down=G_down, config=config)
+    print('Probability = ' + str(p))
+
+
+computeProbability_intelligent()
