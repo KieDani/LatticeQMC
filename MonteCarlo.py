@@ -22,7 +22,7 @@ v = np.arccosh(np.exp(U*deltaTau/2.))
 C1 = 0.5*np.exp(-1*U*deltaTau/4.)
 ha = Ha.Hamiltonian(L=L, U=U, mu=mu, t=t)
 #conf is Object, config is array
-conf = configuration.Configuration(N=N, T=stepsize)
+conf = configuration.Configuration(N=N, T=stepsize, seed=1234)
 
 
 #I don't know if I have to use dot or *
