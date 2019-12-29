@@ -44,6 +44,3 @@ class Configuration:
         return self.config[n,t]
 
 
-    #do not use for big problems
-    def printConfiguration(self):
-        print(self.config)

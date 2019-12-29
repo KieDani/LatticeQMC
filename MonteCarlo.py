@@ -5,13 +5,13 @@ import configuration
 import Hamiltonian as Ha
 
 
-L=7
+L=4
 dim = 1
 N = L**dim
 T = 5.
 #no k_B used yet
 beta = 1/T
-stepsize = 200
+stepsize = 20
 deltaTau = T/stepsize
 U = 5
 t = 1
@@ -138,9 +138,10 @@ def computeProbability_intelligent():
 
 #computeProbability_intelligent()
 
-def warmup(sweeps=300):
+def warmup(sweeps=40):
     conf = configuration.Configuration(N=N, T=stepsize, seed=12345)
     config = conf.get()
+    configOld = np.copy(config)
     old = np.linalg.det(computeM_sigma(sigma=+1, config=config)) * np.linalg.det(computeM_sigma(sigma=-1, config=config))
     for i in range(0, sweeps):
         i = np.random.randint(0,N)
@@ -156,11 +157,19 @@ def warmup(sweeps=300):
         if(r<Prob):
            print('accept move')
            old = new
+           #display only for small matrices
+           if(N*stepsize<=100):
+                print(configOld-config)
+           configOld = np.copy(config)
         else:
             print('do not accept move :(')
             #restore old state again
             conf.update(i, l)
             config = conf.get()
+
+        print('_______________________________________')
+        #print(config)
+        #print('_______________________________________')
 
 
 
