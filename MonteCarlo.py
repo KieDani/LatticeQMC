@@ -5,7 +5,7 @@ import configuration
 import Hamiltonian as Ha
 
 
-L=5
+L=7
 dim = 1
 N = L**dim
 T = 5.
@@ -76,8 +76,8 @@ def computeM_sigma(sigma, config):
         Bs = mult(Bs, B)
         lmax -= 1
     M = M + Bs
-    print('Determinante ' + str(sigma))
-    print(np.linalg.det(M))
+    #print('Determinante ' + str(sigma))
+    #print(np.linalg.det(M))
     #print(M)
     return M
 
@@ -87,7 +87,7 @@ def computeM_sigma(sigma, config):
 def computeG_sigma(sigma, M_sigma):
     G = np.linalg.inv(M_sigma)
     print('G_'+ str(sigma))
-    print(G)
+    #print(G)
     return G
 
 #Probability of acceptance of a spinfilp at site i and time l
@@ -115,13 +115,13 @@ def computeProbability_determinants():
     conf.update(1,34)
     config = conf.get()
     b = np.linalg.det(computeM_sigma(sigma=+1, config=config))*np.linalg.det(computeM_sigma(sigma=-1, config=config))
-    #y= computeM_sigma(sigma=1, config = config)
-    print('Ergebnis')
+    y= computeM_sigma(sigma=1, config = config)
+    #print('Ergebnis')
     print(b/a)
-    #print(x-y)
+    print(x-y)
 
 
-computeProbability_determinants()
+#computeProbability_determinants()
 
 def computeProbability_intelligent():
     conf = configuration.Configuration(N=N, T=stepsize, seed=1234)
@@ -136,4 +136,32 @@ def computeProbability_intelligent():
     print('Probability = ' + str(p))
 
 
-computeProbability_intelligent()
+#computeProbability_intelligent()
+
+def warmup(sweeps=300):
+    conf = configuration.Configuration(N=N, T=stepsize, seed=12345)
+    config = conf.get()
+    old = np.linalg.det(computeM_sigma(sigma=+1, config=config)) * np.linalg.det(computeM_sigma(sigma=-1, config=config))
+    for i in range(0, sweeps):
+        i = np.random.randint(0,N)
+        l = np.random.randint(0, stepsize)
+        conf.update(i,l)
+        config = conf.get()
+        new = np.linalg.det(computeM_sigma(sigma=+1, config=config)) * np.linalg.det(computeM_sigma(sigma=-1, config=config))
+        #Random number between 0 and 1
+        r = np.random.rand()
+        print('Random number ' + str(r))
+        Prob = new/old
+        print('Probability ' + str(Prob))
+        if(r<Prob):
+           print('accept move')
+           old = new
+        else:
+            print('do not accept move :(')
+            #restore old state again
+            conf.update(i, l)
+            config = conf.get()
+
+
+
+warmup()
