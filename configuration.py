@@ -42,3 +42,8 @@ class Configuration:
     #returns an element of the array config
     def get_index(self, n, t):
         return self.config[n,t]
+
+
+    #do not use for big problems
+    def printConfiguration(self):
+        print(self.config)
