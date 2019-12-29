@@ -173,4 +173,47 @@ def warmup(sweeps=40):
 
 
 
+def measureG_sigma(sweeps, sigma):
+    conf = configuration.Configuration(N=N, T=stepsize, seed=12345)
+    config = conf.get()
+    #configOld = np.copy(config)
+    old = np.linalg.det(computeM_sigma(sigma=+1, config=config)) * np.linalg.det(
+        computeM_sigma(sigma=-1, config=config))
+    for i in range(0, sweeps):
+        i = np.random.randint(0, N)
+        l = np.random.randint(0, stepsize)
+        conf.update(i, l)
+        config = conf.get()
+        new = np.linalg.det(computeM_sigma(sigma=+1, config=config)) * np.linalg.det(
+            computeM_sigma(sigma=-1, config=config))
+        # Random number between 0 and 1
+        r = np.random.rand()
+        print('Random number ' + str(r))
+        Prob = new / old
+        print('Probability ' + str(Prob))
+        if (r < Prob):
+            print('accept move')
+            old = new
+            # display only for small matrices
+            #if (N * stepsize <= 100):
+                #print(configOld - config)
+            #configOld = np.copy(config)
+            G = np.linalg.inv(computeM_sigma(sigma=sigma, config=config))
+            print('Greensfunction')
+            print(G)
+        else:
+            print('do not accept move :(')
+            # restore old state again
+            conf.update(i, l)
+            config = conf.get()
+
+        print('_______________________________________')
+        # print(config)
+        # print('_______________________________________')
+
+
+
+
 warmup()
+
+measureG_sigma(sweeps=20, sigma=1)
