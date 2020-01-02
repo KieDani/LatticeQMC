@@ -1,14 +1,17 @@
 import numpy as np
 import scipy as sp
 import scipy.linalg as la
+from multiprocessing import Pool
+from tempfile import TemporaryFile
 import configuration
 import Hamiltonian as Ha
 
-
+#not used yet
+numberCores = 4
 L=5
 dim = 1
 N = L**dim
-T = 50.
+T = 5.
 kB = 1.38064852e-23
 beta = 1/(T * kB)
 stepsize = 200
@@ -23,6 +26,9 @@ C1 = 0.5*np.exp(-1*U*deltaTau/4.)
 ha = Ha.Hamiltonian(L=L, U=U, mu=mu, t=t)
 #conf is Object, config is array
 conf = configuration.Configuration(N=N, T=stepsize, seed=1234)
+
+
+
 
 
 #I don't know if I have to use dot or *
@@ -183,6 +189,9 @@ def measureG(sweeps):
     old = np.linalg.det(computeM_sigma(sigma=+1, config=config)) * np.linalg.det(
         computeM_sigma(sigma=-1, config=config))
     for i in range(0, sweeps):
+        print('Step ' + str(i))
+        G_up_tmp = 0
+        G_down_tmp = 0
         i = np.random.randint(0, N)
         l = np.random.randint(0, stepsize)
         conf.update(i, l)
@@ -203,32 +212,83 @@ def measureG(sweeps):
                 #print(configOld - config)
             #configOld = np.copy(config)
             G_up_tmp = np.linalg.inv(M_up)
-            G_up += G_up_tmp
             print('Greensfunction up')
             print(G_up_tmp)
             G_down_tmp = np.linalg.inv(M_down)
             print('Greensfunction down')
             print(G_down_tmp)
-            G_down += G_down_tmp
-            number += 1
         else:
             print('do not accept move :(')
             # restore old state again
             conf.update(i, l)
             config = conf.get()
+        G_up += G_up_tmp
+        G_down += G_down_tmp
+        number += 1
 
         print('_______________________________________')
         # print(config)
         # print('_______________________________________')
     G_up = G_up/number
     G_down = G_down/number
+    print('hallo')
     return G_up, G_down
 
 
 
-warmup()
+def measure(thermalization, sweeps):
+    warmup(sweeps=thermalization)
+    global tmp
+    with Pool(1) as p:
+        tmp = p.map(measureG, [sweeps])[0]
+        print(tmp)
+    G_up = tmp[0]
+    G_down = tmp[1]
+    return G_up, G_down
 
-G_up, G_down = measureG(sweeps=1000)
-print('---->')
+
+
+#DOS in real space
+def calculateDOS_i_sigma(G_sigma):
+    DOS_sigma = list()
+    for i in range(0,N):
+        DOS_sigma.append(1-G_sigma[i,i])
+    return DOS_sigma
+
+
+#only working for simple chain. Use definition of lattice in future
+def DFT(k, DOS_sigma):
+    #lattice constant
+    #a = 5e-10
+    a=1
+    DOS_k = 0
+    for i in range(0,N):
+        DOS_k += np.exp(complex(0,1)*a*i*k)*DOS_sigma[i]
+    DOS_k *= 1./N
+    return DOS_k
+
+
+
+
+
+
+#G_up, G_down = measure(thermalization=500, sweeps=1000)
+#np.savetxt('G_up.txt', G_up)
+#np.savetxt('G_down.txt', G_down)
+G_up = np.loadtxt('G_up.txt')
+G_down = np.loadtxt('G_down.txt')
+
 print(G_up)
 print(G_down)
+
+DOS_up = calculateDOS_i_sigma(G_up)
+print('DOS up')
+print(DOS_up)
+DOS_down = calculateDOS_i_sigma(G_down)
+print('DOS down')
+print(DOS_down)
+
+k = np.linspace(0, np.pi, 100)
+DOS_k = DFT(k, DOS_up)
+print('DOS')
+print(DOS_k)
