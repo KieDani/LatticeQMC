@@ -5,13 +5,13 @@ import configuration
 import Hamiltonian as Ha
 
 
-L=4
+L=5
 dim = 1
 N = L**dim
 T = 5.
-#no k_B used yet
-beta = 1/T
-stepsize = 20
+kB = 1.38064852e-23
+beta = 1/(T * kB)
+stepsize = 200
 deltaTau = T/stepsize
 U = 5
 t = 1
@@ -138,7 +138,7 @@ def computeProbability_intelligent():
 
 #computeProbability_intelligent()
 
-def warmup(sweeps=40):
+def warmup(sweeps=20*N):
     conf = configuration.Configuration(N=N, T=stepsize, seed=12345)
     config = conf.get()
     configOld = np.copy(config)
