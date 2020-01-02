@@ -8,7 +8,7 @@ import Hamiltonian as Ha
 L=5
 dim = 1
 N = L**dim
-T = 5.
+T = 50.
 kB = 1.38064852e-23
 beta = 1/(T * kB)
 stepsize = 200
@@ -138,7 +138,7 @@ def computeProbability_intelligent():
 
 #computeProbability_intelligent()
 
-def warmup(sweeps=20*N):
+def warmup(sweeps=int(0.5*N*stepsize)):
     conf = configuration.Configuration(N=N, T=stepsize, seed=12345)
     config = conf.get()
     configOld = np.copy(config)
@@ -173,7 +173,10 @@ def warmup(sweeps=20*N):
 
 
 
-def measureG_sigma(sweeps, sigma):
+def measureG(sweeps):
+    number = 0
+    G_up = 0
+    G_down = 0
     conf = configuration.Configuration(N=N, T=stepsize, seed=12345)
     config = conf.get()
     #configOld = np.copy(config)
@@ -184,8 +187,9 @@ def measureG_sigma(sweeps, sigma):
         l = np.random.randint(0, stepsize)
         conf.update(i, l)
         config = conf.get()
-        new = np.linalg.det(computeM_sigma(sigma=+1, config=config)) * np.linalg.det(
-            computeM_sigma(sigma=-1, config=config))
+        M_up = computeM_sigma(sigma=+1, config=config)
+        M_down = computeM_sigma(sigma=-1, config=config)
+        new = np.linalg.det(M_up) * np.linalg.det(M_down)
         # Random number between 0 and 1
         r = np.random.rand()
         print('Random number ' + str(r))
@@ -198,9 +202,15 @@ def measureG_sigma(sweeps, sigma):
             #if (N * stepsize <= 100):
                 #print(configOld - config)
             #configOld = np.copy(config)
-            G = np.linalg.inv(computeM_sigma(sigma=sigma, config=config))
-            print('Greensfunction')
-            print(G)
+            G_up_tmp = np.linalg.inv(M_up)
+            G_up += G_up_tmp
+            print('Greensfunction up')
+            print(G_up_tmp)
+            G_down_tmp = np.linalg.inv(M_down)
+            print('Greensfunction down')
+            print(G_down_tmp)
+            G_down += G_down_tmp
+            number += 1
         else:
             print('do not accept move :(')
             # restore old state again
@@ -210,10 +220,15 @@ def measureG_sigma(sweeps, sigma):
         print('_______________________________________')
         # print(config)
         # print('_______________________________________')
-
+    G_up = G_up/number
+    G_down = G_down/number
+    return G_up, G_down
 
 
 
 warmup()
 
-measureG_sigma(sweeps=20, sigma=1)
+G_up, G_down = measureG(sweeps=1000)
+print('---->')
+print(G_up)
+print(G_down)
