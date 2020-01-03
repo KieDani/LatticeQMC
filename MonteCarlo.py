@@ -2,7 +2,8 @@ import numpy as np
 import scipy as sp
 import scipy.linalg as la
 from multiprocessing import Pool
-from tempfile import TemporaryFile
+import multiprocessing
+import functools
 import configuration
 import Hamiltonian as Ha
 
@@ -14,7 +15,7 @@ N = L**dim
 T = 5.
 kB = 1.38064852e-23
 beta = 1/(T * kB)
-stepsize = 200
+stepsize = 300
 deltaTau = T/stepsize
 U = 5
 t = 1
@@ -25,7 +26,7 @@ v = np.arccosh(np.exp(U*deltaTau/2.))
 C1 = 0.5*np.exp(-1*U*deltaTau/4.)
 ha = Ha.Hamiltonian(L=L, U=U, mu=mu, t=t)
 #conf is Object, config is array
-conf = configuration.Configuration(N=N, T=stepsize, seed=1234)
+#conf = configuration.Configuration(N=N, T=stepsize, seed=1234)
 
 
 
@@ -144,12 +145,17 @@ def computeProbability_intelligent():
 
 #computeProbability_intelligent()
 
-def warmup(sweeps=int(0.5*N*stepsize)):
-    conf = configuration.Configuration(N=N, T=stepsize, seed=12345)
+def warmup(sweeps=int(0.5*N*stepsize), seed=1234):
+    print('aktueller Prozess:')
+    print(multiprocessing.current_process().pid)
+    seed *= multiprocessing.current_process().pid
+    #global conf
+    conf = configuration.Configuration(N=N, T=stepsize, seed=seed)
     config = conf.get()
     configOld = np.copy(config)
     old = np.linalg.det(computeM_sigma(sigma=+1, config=config)) * np.linalg.det(computeM_sigma(sigma=-1, config=config))
     for i in range(0, sweeps):
+        print('warmup step ' + str(i))
         i = np.random.randint(0,N)
         l = np.random.randint(0, stepsize)
         conf.update(i,l)
@@ -176,14 +182,16 @@ def warmup(sweeps=int(0.5*N*stepsize)):
         print('_______________________________________')
         #print(config)
         #print('_______________________________________')
+    return conf
 
 
 
-def measureG(sweeps):
+def measureG(sweeps, thermalization=int(0.5*N*stepsize), seed=1234):
     number = 0
     G_up = 0
     G_down = 0
-    conf = configuration.Configuration(N=N, T=stepsize, seed=12345)
+    #conf = configuration.Configuration(N=N, T=stepsize, seed=seed)
+    conf = warmup(sweeps=thermalization, seed=seed)
     config = conf.get()
     #configOld = np.copy(config)
     old = np.linalg.det(computeM_sigma(sigma=+1, config=config)) * np.linalg.det(
@@ -235,15 +243,21 @@ def measureG(sweeps):
     return G_up, G_down
 
 
-
+#number of sweeps is not exact because of integer division
 def measure(thermalization, sweeps):
-    warmup(sweeps=thermalization)
     global tmp
-    with Pool(1) as p:
-        tmp = p.map(measureG, [sweeps])[0]
-        print(tmp)
-    G_up = tmp[0]
-    G_down = tmp[1]
+    G_up = 0
+    G_down = 0
+    with Pool(numberCores) as p:
+        sweep = np.ones(numberCores, dtype=np.int64) * int(round(float(sweeps)/numberCores))
+        result = p.map(functools.partial(measureG, thermalization=thermalization, seed=1234), sweep)
+        print(result)
+        for i in range(0, numberCores):
+            tmp = result[i]
+            G_up += tmp[0]
+            G_down += tmp[1]
+        G_up = G_up/numberCores
+        G_down = G_down/numberCores
     return G_up, G_down
 
 
@@ -272,23 +286,25 @@ def DFT(k, DOS_sigma):
 
 
 
-#G_up, G_down = measure(thermalization=500, sweeps=1000)
-#np.savetxt('G_up.txt', G_up)
-#np.savetxt('G_down.txt', G_down)
-G_up = np.loadtxt('G_up.txt')
-G_down = np.loadtxt('G_down.txt')
+G_up, G_down = measure(thermalization=1000, sweeps=2000)
+np.savetxt('G_up.txt', G_up)
+np.savetxt('G_down.txt', G_down)
 
-print(G_up)
-print(G_down)
+# G_up = np.loadtxt('G_up.txt')
+# G_down = np.loadtxt('G_down.txt')
+#
+# print(G_up)
+# print(G_down)
+#
+# DOS_up = calculateDOS_i_sigma(G_up)
+# print('DOS up')
+# print(DOS_up)
+# DOS_down = calculateDOS_i_sigma(G_down)
+# print('DOS down')
+# print(DOS_down)
+#
+# k = np.linspace(0, np.pi, 100)
+# DOS_k = DFT(k, DOS_up)
+# print('DOS')
+# print(DOS_k)
 
-DOS_up = calculateDOS_i_sigma(G_up)
-print('DOS up')
-print(DOS_up)
-DOS_down = calculateDOS_i_sigma(G_down)
-print('DOS down')
-print(DOS_down)
-
-k = np.linspace(0, np.pi, 100)
-DOS_k = DFT(k, DOS_up)
-print('DOS')
-print(DOS_k)
