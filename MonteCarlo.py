@@ -15,7 +15,7 @@ N = L**dim
 T = 5.
 kB = 1.38064852e-23
 beta = 1/(T * kB)
-stepsize = 300
+stepsize = 200
 deltaTau = T/stepsize
 U = 5
 t = 1
@@ -286,22 +286,22 @@ def DFT(k, DOS_sigma):
 
 
 
-G_up, G_down = measure(thermalization=1000, sweeps=2000)
-np.savetxt('G_up.txt', G_up)
-np.savetxt('G_down.txt', G_down)
+#G_up, G_down = measure(thermalization=1000, sweeps=2000)
+#np.savetxt('G_up.txt', G_up)
+#np.savetxt('G_down.txt', G_down)
 
-# G_up = np.loadtxt('G_up.txt')
-# G_down = np.loadtxt('G_down.txt')
+G_up = np.loadtxt('G_up.txt')
+G_down = np.loadtxt('G_down.txt')
 #
 # print(G_up)
 # print(G_down)
 #
-# DOS_up = calculateDOS_i_sigma(G_up)
-# print('DOS up')
-# print(DOS_up)
-# DOS_down = calculateDOS_i_sigma(G_down)
-# print('DOS down')
-# print(DOS_down)
+DOS_up = calculateDOS_i_sigma(G_up)
+print('DOS up')
+print(DOS_up)
+DOS_down = calculateDOS_i_sigma(G_down)
+print('DOS down')
+print(DOS_down)
 #
 # k = np.linspace(0, np.pi, 100)
 # DOS_k = DFT(k, DOS_up)
