@@ -22,8 +22,8 @@ t = 1
 mu = 2
 #Unterschied zwischen Vorlesung und Paper
 v = np.arccosh(np.exp(U*deltaTau/2.))
-lamb = v
-#lamb = np.exp(U*deltaTau/2.)
+#lamb = v
+lamb = np.exp(U*deltaTau/2.)
 C1 = 0.5*np.exp(-1*U*deltaTau/4.)
 ha = Ha.Hamiltonian(L=L, U=U, mu=mu, t=t)
 #conf is Object, config is array
@@ -373,7 +373,7 @@ def DFT(k, DOS_sigma):
 
 
 
-G_up, G_down = measure(thermalization=10, sweeps=20, determinants=False)
+G_up, G_down = measure(thermalization=500, sweeps=2000, determinants=False)
 #np.savetxt('G_up.txt', G_up)
 #np.savetxt('G_down.txt', G_down)
 
