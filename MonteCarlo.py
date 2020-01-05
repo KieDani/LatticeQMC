@@ -12,7 +12,7 @@ numberCores = 4
 L=5
 dim = 1
 N = L**dim
-T = 25.
+T = 2.
 kB = 1.38064852e-23
 beta = 1/(T * kB)
 stepsize = 200
@@ -22,8 +22,8 @@ t = 1
 mu = 2
 #Unterschied zwischen Vorlesung und Paper
 v = np.arccosh(np.exp(U*deltaTau/2.))
-#lamb = v
-lamb = np.exp(U*deltaTau/2.)
+lamb = v
+#lamb = np.exp(U*deltaTau/2.)
 C1 = 0.5*np.exp(-1*U*deltaTau/4.)
 ha = Ha.Hamiltonian(L=L, U=U, mu=mu, t=t)
 #conf is Object, config is array
