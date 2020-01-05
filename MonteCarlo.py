@@ -17,7 +17,7 @@ kB = 1.38064852e-23
 beta = 1/(T * kB)
 stepsize = 200
 deltaTau = T/stepsize
-U = 5
+U = 2
 t = 1
 mu = 2
 #Unterschied zwischen Vorlesung und Paper
@@ -345,6 +345,8 @@ def measure(thermalization, sweeps, determinants=True):
             G_down += tmp[1]
         G_up = G_up/numberCores
         G_down = G_down/numberCores
+    np.savetxt('G_up_U' + str(U) + 't' + str(t) + 'mu' + str(mu) + 'T' + str(T) + 'step' + str(stepsize) + 'det' + str(determinants) + '.txt', G_up)
+    np.savetxt('G_down_U' + str(U) + 't' + str(t) + 'mu' + str(mu) + 'T' + str(T) + 'step' + str(stepsize) + 'det' + str(determinants) + '.txt', G_down)
     return G_up, G_down
 
 
