@@ -76,26 +76,15 @@ def computeM_sigma(sigma, config, determinants = True):
     for i in range(1,N):
         M[i,i] = 1.
 
-    if(determinants==True):
-        lmax = stepsize-1
-        Bs = computeB_lsigma(l=lmax, sigma=sigma, config=config, determinants=determinants)
+    lmax = stepsize - 1
+    Bs = computeB_lsigma(l=lmax, sigma=sigma, config=config, determinants=determinants)
+    lmax -= 1
+    while (lmax >= 0):
+        B = computeB_lsigma(l=lmax, sigma=sigma, config=config, determinants=determinants)
+        Bs = mult(Bs, B)
         lmax -= 1
-        while(lmax >= 0):
-            B = computeB_lsigma(l=lmax, sigma=sigma, config=config, determinants=determinants)
-            Bs = mult(Bs, B)
-            lmax -= 1
-        M = M + Bs
-        return M
-    else:
-        lmax = 0
-        Bs = computeB_lsigma(l=lmax, sigma=sigma, config=config, determinants=determinants)
-        lmax += 1
-        while (lmax < stepsize):
-            B = computeB_lsigma(l=lmax, sigma=sigma, config=config, determinants=determinants)
-            Bs = mult(Bs, B)
-            lmax += 1
-        M = M + Bs
-        return M
+    M = M + Bs
+    return M
 
 
 
