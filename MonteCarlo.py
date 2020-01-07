@@ -14,8 +14,9 @@ dim = 1
 N = L**dim
 T = 2.
 kB = 1.38064852e-23
+#not used yet!!!
 beta = 1/(T * kB)
-stepsize = 200
+stepsize = 150
 deltaTau = T/stepsize
 U = 2
 t = 1
