@@ -153,34 +153,34 @@ def warmup(sweeps=int(0.5*N*stepsize), seed=1234, determinants=True):
         config = conf.get()
         configOld = np.copy(config)
         old = np.linalg.det(computeM_sigma(sigma=+1, config=config)) * np.linalg.det(computeM_sigma(sigma=-1, config=config))
-        for i in range(0, sweeps):
+        for a in range(0, sweeps):
             print('warmup step ' + str(i))
-            i = np.random.randint(0,N)
-            l = np.random.randint(0, stepsize)
-            conf.update(i,l)
-            config = conf.get()
-            new = np.linalg.det(computeM_sigma(sigma=+1, config=config)) * np.linalg.det(computeM_sigma(sigma=-1, config=config))
-            #Random number between 0 and 1
-            r = np.random.rand()
-            print('Random number ' + str(r))
-            Prob = new/old
-            print('Probability ' + str(Prob))
-            if(r<Prob):
-               print('accept move')
-               old = new
-               #display only for small matrices
-               if(N*stepsize<=100):
-                    print(configOld-config)
-               configOld = np.copy(config)
-            else:
-                print('do not accept move :(')
-                #restore old state again
-                conf.update(i, l)
-                config = conf.get()
+            for i in range(0,N):
+                for l in range(0,stepsize):
+                    conf.update(i,l)
+                    config = conf.get()
+                    new = np.linalg.det(computeM_sigma(sigma=+1, config=config)) * np.linalg.det(computeM_sigma(sigma=-1, config=config))
+                    #Random number between 0 and 1
+                    r = np.random.rand()
+                    print('Random number ' + str(r))
+                    Prob = new/old
+                    print('Probability ' + str(Prob))
+                    if(r<Prob):
+                       print('accept move')
+                       old = new
+                       #display only for small matrices
+                       if(N*stepsize<=100):
+                            print(configOld-config)
+                       configOld = np.copy(config)
+                    else:
+                        print('do not accept move :(')
+                        #restore old state again
+                        conf.update(i, l)
+                        config = conf.get()
 
-            print('_______________________________________')
-            #print(config)
-            #print('_______________________________________')
+                    print('_______________________________________')
+                    #print(config)
+                    #print('_______________________________________')
         return conf
     else:
         #Greensfunction does not need to be calculated anew every step!
@@ -230,39 +230,41 @@ def measureG(sweeps, thermalization=int(0.5*N*stepsize), seed=1234, determinants
         M_down = computeM_sigma(sigma=-1, config=config, determinants=determinants)
         G_up_tmp = np.linalg.inv(M_up)
         G_down_tmp = np.linalg.inv(M_down)
-        for i in range(0, sweeps):
-            print('Step ' + str(i))
-            i = np.random.randint(0, N)
-            l = np.random.randint(0, stepsize)
-            conf.update(i, l)
-            config = conf.get()
-            M_up = computeM_sigma(sigma=+1, config=config, determinants=determinants)
-            M_down = computeM_sigma(sigma=-1, config=config, determinants=determinants)
-            new = np.linalg.det(M_up) * np.linalg.det(M_down)
-            # Random number between 0 and 1
-            r = np.random.rand()
-            print('Random number ' + str(r))
-            Prob = new / old
-            print('Probability ' + str(Prob))
-            if (r < Prob):
-                print('accept move')
-                old = new
-                G_up_tmp = np.linalg.inv(M_up)
-                print('Greensfunction up')
-                print(G_up_tmp)
-                G_down_tmp = np.linalg.inv(M_down)
-                print('Greensfunction down')
-                print(G_down_tmp)
-            else:
-                print('do not accept move :(')
-                # restore old state again
-                conf.update(i, l)
-                config = conf.get()
-            G_up += G_up_tmp
-            G_down += G_down_tmp
-            number += 1
+        for a in range(0, sweeps):
+            for i in range(0,N):
+                for l in range(0,stepsize):
+                    print('Step ' + str(i))
+                    i = np.random.randint(0, N)
+                    l = np.random.randint(0, stepsize)
+                    conf.update(i, l)
+                    config = conf.get()
+                    M_up = computeM_sigma(sigma=+1, config=config, determinants=determinants)
+                    M_down = computeM_sigma(sigma=-1, config=config, determinants=determinants)
+                    new = np.linalg.det(M_up) * np.linalg.det(M_down)
+                    # Random number between 0 and 1
+                    r = np.random.rand()
+                    print('Random number ' + str(r))
+                    Prob = new / old
+                    print('Probability ' + str(Prob))
+                    if (r < Prob):
+                        print('accept move')
+                        old = new
+                        G_up_tmp = np.linalg.inv(M_up)
+                        print('Greensfunction up')
+                        print(G_up_tmp)
+                        G_down_tmp = np.linalg.inv(M_down)
+                        print('Greensfunction down')
+                        print(G_down_tmp)
+                    else:
+                        print('do not accept move :(')
+                        # restore old state again
+                        conf.update(i, l)
+                        config = conf.get()
+                    G_up += G_up_tmp
+                    G_down += G_down_tmp
+                    number += 1
 
-            print('_______________________________________')
+                    print('_______________________________________')
         G_up = G_up/number
         G_down = G_down/number
         print('hallo')
@@ -368,7 +370,7 @@ def DFT(k, DOS_sigma):
 
 
 
-G_up, G_down = measure(thermalization=500, sweeps=2000, determinants=False)
+G_up, G_down = measure(thermalization=10, sweeps=100, determinants=False)
 #np.savetxt('G_up.txt', G_up)
 #np.savetxt('G_down.txt', G_down)
 
