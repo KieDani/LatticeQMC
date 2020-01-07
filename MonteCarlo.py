@@ -236,10 +236,12 @@ def measureG(sweeps, thermalization=int(0.5*N*stepsize), seed=1234, determinants
         config = conf.get()
         old = np.linalg.det(computeM_sigma(sigma=+1, config=config, determinants=determinants)) * np.linalg.det(
             computeM_sigma(sigma=-1, config=config, determinants=determinants))
+        M_up = computeM_sigma(sigma=+1, config=config, determinants=determinants)
+        M_down = computeM_sigma(sigma=-1, config=config, determinants=determinants)
+        G_up_tmp = np.linalg.inv(M_up)
+        G_down_tmp = np.linalg.inv(M_down)
         for i in range(0, sweeps):
             print('Step ' + str(i))
-            G_up_tmp = 0
-            G_down_tmp = 0
             i = np.random.randint(0, N)
             l = np.random.randint(0, stepsize)
             conf.update(i, l)
