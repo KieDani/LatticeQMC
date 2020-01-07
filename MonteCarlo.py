@@ -154,9 +154,9 @@ def warmup(sweeps=int(0.5*N*stepsize), seed=1234, determinants=True):
         configOld = np.copy(config)
         old = np.linalg.det(computeM_sigma(sigma=+1, config=config)) * np.linalg.det(computeM_sigma(sigma=-1, config=config))
         for a in range(0, sweeps):
-            print('warmup step ' + str(i))
             for i in range(0,N):
                 for l in range(0,stepsize):
+                    print('warmup step ' + str(a))
                     conf.update(i,l)
                     config = conf.get()
                     new = np.linalg.det(computeM_sigma(sigma=+1, config=config)) * np.linalg.det(computeM_sigma(sigma=-1, config=config))
@@ -233,7 +233,7 @@ def measureG(sweeps, thermalization=int(0.5*N*stepsize), seed=1234, determinants
         for a in range(0, sweeps):
             for i in range(0,N):
                 for l in range(0,stepsize):
-                    print('Step ' + str(i))
+                    print('Step ' + str(a))
                     i = np.random.randint(0, N)
                     l = np.random.randint(0, stepsize)
                     conf.update(i, l)
@@ -370,7 +370,7 @@ def DFT(k, DOS_sigma):
 
 
 
-G_up, G_down = measure(thermalization=10, sweeps=100, determinants=False)
+G_up, G_down = measure(thermalization=10, sweeps=80, determinants=False)
 #np.savetxt('G_up.txt', G_up)
 #np.savetxt('G_down.txt', G_down)
 
