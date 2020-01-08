@@ -189,21 +189,37 @@ def warmup(sweeps=int(0.5*N*stepsize), seed=1234, determinants=True):
         seed *= multiprocessing.current_process().pid
         # global conf
         conf = configuration.Configuration(N=N, T=stepsize, seed=seed)
-        for i in range(0, sweeps):
-            config = conf.get()
-            print('warmup step ' + str(i))
-            i = np.random.randint(0,N)
-            l = np.random.randint(0, stepsize)
-            # Random number between 0 and 1
-            r = np.random.rand()
-            print('Random number ' + str(r))
-            d_up = 1+(1-np.linalg.inv(computeM_sigma(sigma=+1, config=config, determinants=determinants))[i][i])*(np.exp(-2*lamb*config[i][l])-1)
-            d_down = 1+(1-np.linalg.inv(computeM_sigma(sigma=-1, config=config, determinants=determinants))[i][i])*(np.exp(2*lamb*config[i][l])-1)
-            Prob = d_up + d_down
-            print('Probability ' + str(Prob))
-            if(r<Prob):
-                print('accept move')
-                conf.update(n=i, t=l)
+        config = conf.get()
+        G_up = np.linalg.inv(computeM_sigma(sigma=+1, config=config, determinants=determinants))
+        G_down = np.linalg.inv(computeM_sigma(sigma=+1, config=config, determinants=determinants))
+        for a in range(0, sweeps):
+            for i in range(0,N):
+                for l in range(0,stepsize):
+                    config = conf.get()
+                    print('warmup step ' + str(a))
+                    # Random number between 0 and 1
+                    r = np.random.rand()
+                    print('Random number ' + str(r))
+                    d_up = 1+(1-np.linalg.inv(computeM_sigma(sigma=+1, config=config, determinants=determinants))[i][i])*(np.exp(-2*lamb*config[i][l])-1)
+                    d_down = 1+(1-np.linalg.inv(computeM_sigma(sigma=-1, config=config, determinants=determinants))[i][i])*(np.exp(2*lamb*config[i][l])-1)
+                    Prob = d_up + d_down
+                    print('Probability ' + str(Prob))
+                    if (r < Prob):
+                        print('accept move')
+                        c_up = np.zeros(N, dtype=np.float64)
+                        c_up[i] = np.exp(-2 * lamb * config[i][l]) - 1
+                        c_down = np.zeros(N, dtype=np.float64)
+                        c_down[i] = np.exp(+2 * lamb * config[i][l]) - 1
+                        c_up = -1 * (np.exp(-2 * lamb * config[i][l]) - 1) * G_up[i, :] + c_up
+                        c_down = -1 * (np.exp(2 * lamb * config[i][l]) - 1) * G_down[i, :] + c_down
+                        b_up = G_up[:, i] / (1. + c_up[i])
+                        b_down = G_down[:, i] / (1. + c_down[i])
+                        G_up = G_up - np.outer(b_up, c_up)
+                        G_down = G_down - np.outer(b_down, c_down)
+
+                        conf.update(n=i, t=l)
+                    else:
+                        print('do not accept move :(')
         return conf
 
 
@@ -234,8 +250,6 @@ def measureG(sweeps, thermalization=int(0.5*N*stepsize), seed=1234, determinants
             for i in range(0,N):
                 for l in range(0,stepsize):
                     print('Step ' + str(a))
-                    i = np.random.randint(0, N)
-                    l = np.random.randint(0, stepsize)
                     conf.update(i, l)
                     config = conf.get()
                     M_up = computeM_sigma(sigma=+1, config=config, determinants=determinants)
@@ -278,42 +292,42 @@ def measureG(sweeps, thermalization=int(0.5*N*stepsize), seed=1234, determinants
         G_down2 = 0
         G_up = np.linalg.inv(computeM_sigma(sigma=+1, config=config, determinants=determinants))
         G_down = np.linalg.inv(computeM_sigma(sigma=+1, config=config, determinants=determinants))
-        for i in range(0, sweeps):
-            print('Step ' + str(i))
-            config = conf.get()
-            i = np.random.randint(0, N)
-            l = np.random.randint(0, stepsize)
-            # Random number between 0 and 1
-            r = np.random.rand()
-            print('Random number ' + str(r))
-            d_up = 1 + (1 - np.linalg.inv(computeM_sigma(sigma=+1, config=config, determinants=determinants))[i][i]) * (
-                        np.exp(-2 * lamb * config[i][l]) - 1)
-            d_down = 1 + (
-                        1 - np.linalg.inv(computeM_sigma(sigma=-1, config=config, determinants=determinants))[i][i]) * (
-                                 np.exp(2 * lamb * config[i][l]) - 1)
-            Prob = d_up + d_down
-            print('Probability ' + str(Prob))
-            if (r < Prob):
-                print('accept move')
-                c_up = np.zeros(N, dtype=np.float64)
-                c_up[i] = np.exp(-2*lamb*config[i][l])-1
-                c_down = np.zeros(N, dtype=np.float64)
-                c_down[i] = np.exp(+2 * lamb * config[i][l]) - 1
-                c_up = -1*(np.exp(-2*lamb*config[i][l])-1) * G_up[i,:] + c_up
-                c_down = -1 * (np.exp(2 * lamb * config[i][l]) - 1) * G_down[i, :] + c_down
-                b_up = np.zeros(N, dtype=np.float64)
-                b_up = G_up[:,i]/(1. + c_up[i])
-                b_down = np.zeros(N, dtype=np.float64)
-                b_down = G_down[:, i] / (1. + c_down[i])
-                G_up = G_up - np.outer(b_up, c_up)
-                G_down = G_down - np.outer(b_down, c_down)
+        for a in range(0, sweeps):
+            for i in range(0,N):
+                for l in range(0,stepsize):
+                    print('Step ' + str(a))
+                    config = conf.get()
+                    # Random number between 0 and 1
+                    r = np.random.rand()
+                    print('Random number ' + str(r))
+                    d_up = 1 + (1 - np.linalg.inv(computeM_sigma(sigma=+1, config=config, determinants=determinants))[i][i]) * (
+                                np.exp(-2 * lamb * config[i][l]) - 1)
+                    d_down = 1 + (
+                                1 - np.linalg.inv(computeM_sigma(sigma=-1, config=config, determinants=determinants))[i][i]) * (
+                                         np.exp(2 * lamb * config[i][l]) - 1)
+                    Prob = d_up + d_down
+                    print('Probability ' + str(Prob))
+                    if (r < Prob):
+                        print('accept move')
+                        c_up = np.zeros(N, dtype=np.float64)
+                        c_up[i] = np.exp(-2*lamb*config[i][l])-1
+                        c_down = np.zeros(N, dtype=np.float64)
+                        c_down[i] = np.exp(+2 * lamb * config[i][l]) - 1
+                        c_up = -1*(np.exp(-2*lamb*config[i][l])-1) * G_up[i,:] + c_up
+                        c_down = -1 * (np.exp(2 * lamb * config[i][l]) - 1) * G_down[i, :] + c_down
+                        b_up = np.zeros(N, dtype=np.float64)
+                        b_up = G_up[:,i]/(1. + c_up[i])
+                        b_down = np.zeros(N, dtype=np.float64)
+                        b_down = G_down[:, i] / (1. + c_down[i])
+                        G_up = G_up - np.outer(b_up, c_up)
+                        G_down = G_down - np.outer(b_down, c_down)
 
-                conf.update(n=i, t=l)
-            else:
-                print('do not accept move :(')
-            G_up2 += G_up
-            G_down2 += G_down
-            number += 1
+                        conf.update(n=i, t=l)
+                    else:
+                        print('do not accept move :(')
+                    G_up2 += G_up
+                    G_down2 += G_down
+                    number += 1
 
             print('_______________________________________')
         G_up2 = G_up2 / number
