@@ -385,23 +385,23 @@ def DFT(k, DOS_sigma):
 
 
 
-G_up, G_down = measure(thermalization=100, sweeps=1200, determinants=False)
-G_up, G_down = measure(thermalization=100, sweeps=1200, determinants=True)
+#G_up, G_down = measure(thermalization=100, sweeps=1200, determinants=False)
+#G_up, G_down = measure(thermalization=100, sweeps=1200, determinants=True)
 #np.savetxt('G_up.txt', G_up)
 #np.savetxt('G_down.txt', G_down)
 
-#G_up = np.loadtxt('G_up.txt')
-#G_down = np.loadtxt('G_down.txt')
+G_up = np.loadtxt('G_up_U2t1mu2T4.0step25detFalse.txt')
+G_down = np.loadtxt('G_down_U2t1mu2T4.0step25detFalse.txt')
 #
 # print(G_up)
 # print(G_down)
 #
-#DOS_up = calculateDOS_i_sigma(G_up)
-#print('DOS up')
-#print(DOS_up)
-#DOS_down = calculateDOS_i_sigma(G_down)
-#print('DOS down')
-#print(DOS_down)
+DOS_up = calculateDOS_i_sigma(G_up)
+print('DOS up')
+print(DOS_up)
+DOS_down = calculateDOS_i_sigma(G_down)
+print('DOS down')
+print(DOS_down)
 #
 # k = np.linspace(0, np.pi, 100)
 # DOS_k = DFT(k, DOS_up)
