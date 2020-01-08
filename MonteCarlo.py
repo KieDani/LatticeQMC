@@ -9,14 +9,14 @@ import Hamiltonian as Ha
 
 #not used yet
 numberCores = 4
-L=5
+L=4
 dim = 1
 N = L**dim
-T = 2.
+T = 4.
 kB = 1.38064852e-23
 #not used yet!!!
 beta = 1/(T * kB)
-stepsize = 150
+stepsize = 25
 deltaTau = T/stepsize
 U = 2
 t = 1
@@ -29,6 +29,10 @@ C1 = 0.5*np.exp(-1*U*deltaTau/4.)
 ha = Ha.Hamiltonian(L=L, U=U, mu=mu, t=t)
 #conf is Object, config is array
 #conf = configuration.Configuration(N=N, T=stepsize, seed=1234)
+
+
+print('should be smaller than 0.1: ')
+print(t*U*deltaTau**2)
 
 
 
@@ -168,9 +172,6 @@ def warmup(sweeps=int(0.5*N*stepsize), seed=1234, determinants=True):
                     if(r<Prob):
                        print('accept move')
                        old = new
-                       #display only for small matrices
-                       if(N*stepsize<=100):
-                            print(configOld-config)
                        configOld = np.copy(config)
                     else:
                         print('do not accept move :(')
@@ -384,7 +385,8 @@ def DFT(k, DOS_sigma):
 
 
 
-G_up, G_down = measure(thermalization=10, sweeps=80, determinants=False)
+G_up, G_down = measure(thermalization=100, sweeps=1200, determinants=False)
+G_up, G_down = measure(thermalization=100, sweeps=1200, determinants=True)
 #np.savetxt('G_up.txt', G_up)
 #np.savetxt('G_down.txt', G_down)
 
