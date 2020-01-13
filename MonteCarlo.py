@@ -12,7 +12,7 @@ numberCores = 1
 L=4
 dim = 1
 N = L**dim
-T = 2.
+T = 200.
 kB = 1.38064852e-23
 #not used yet!!!
 #beta = 1/(T * kB)
@@ -323,8 +323,8 @@ def DFT(k, DOS_sigma):
 
 
 
-G_up, G_down = measure(thermalization=500, sweeps=3200, determinants=True)
-G_up, G_down = measure(thermalization=500, sweeps=3200, determinants=False)
+G_up, G_down = measure(thermalization=200, sweeps=500, determinants=True)
+#G_up, G_down = measure(thermalization=500, sweeps=3200, determinants=False)
 #np.savetxt('G_up.txt', G_up)
 #np.savetxt('G_down.txt', G_down)
 
