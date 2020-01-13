@@ -48,8 +48,8 @@ class Hamiltonian:
         #hopping
         for i in range(0,len(edges)):
             tmp  = edges[i]
-            K[tmp[0], tmp[1]] = t
-            K[tmp[1], tmp[0]] = t
+            K[tmp[0], tmp[1]] = -t
+            K[tmp[1], tmp[0]] = -t
         #on-site interaction
         for i in range(0,len(sites)):
             tmp  = sites[i]
