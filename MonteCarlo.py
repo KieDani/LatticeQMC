@@ -5,7 +5,7 @@ from multiprocessing import Pool
 import multiprocessing
 import functools
 import configuration
-import Hamiltonian as Ha
+import hubbard as Ha
 
 #not used yet
 numberCores = 1

@@ -1,44 +1,85 @@
+# coding: utf-8
+"""
+Created on 13 Jan 2020
+
+project: LatticeQMC
+version: 1.0
+"""
 import numpy as np
 
 
 class Configuration:
+    """ Configuration class representing the hubbard-Stratonovich (HS) field."""
 
+    def __init__(self, n, n_t):
+        """ Constructor of the Configuration class
 
-    #N...number lattice sites; T...number time slices (per site)
-    def __init__(self, N, T, seed=123):
-        np.random.seed(seed)
-        self.N = N
-        self.T = T
-        self.config = np.zeros((N,T), dtype=np.int8)
+        Parameters
+        ----------
+        n: int
+            Number of spatial lattice sites.
+        n_t: int
+            Number of time slices (per site).
+        """
+        self.n = n
+        self.n_t = n_t
+        self.config = np.zeros((n, n_t))
         self.initialize()
 
+    def copy(self):
+        """ Copies the configuration instance
 
+        Returns
+        -------
+        config: Configuration
+        """
+        config = Configuration(self.n, self.n_t)
+        config.config = np.copy(self.config)
+        return config
 
-    #random initialization of the array config
     def initialize(self):
-        def pmone():
-            tmp = np.random.rand()
-            if(tmp < 0.5):
-                return -1
-            else:
-                return 1
+        """ Initializes the configuration with a random distribution of -1 and +1 """
+        # Create an array of random 0 and 1.
+        config = np.random.randint(0, 2, size=(self.n, self.n_t))
+        # Scale array to -1 and 1
+        self.config = 2*config - 1
 
-        for n in range(0, self.N):
-            for t in range(0,self.T):
-                self.config[n,t] = pmone()
+    def update(self, i, t):
+        """ Update element of array by flipping its spin-value
 
-    #spinflip at site n and time t
-    def update(self, n, t):
-        self.config[n,t] *= -1
+        Parameters
+        ----------
+        i: int
+            Site index.
+        t: int
+            Time slice index.
+        """
+        self.config[i, t] *= -1
 
-
-    #returns the array config
     def get(self):
+        """ (n, m) np.ndarray: Spin-configuration"""
         return self.config
 
+    def get_element(self, i, t):
+        """ Return a element of the array
 
-    #returns an element of the array config
-    def get_index(self, n, t):
-        return self.config[n,t]
+        Parameters
+        ----------
+        i: int
+            Site index.
+        t: int
+            Time slice index.
+
+        Returns
+        -------
+        s: int
+        """
+        return self.config[i, t]
+
+    def __getitem__(self, item):
+        return self.config[item]
+
+    def __str__(self):
+        return str(self.config.T)
 
 

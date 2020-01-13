@@ -1,8 +1,5 @@
 # Specific files
 
-main.py
-project.py
-tikz.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
