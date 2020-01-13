@@ -8,7 +8,7 @@ import configuration
 import Hamiltonian as Ha
 
 #not used yet
-numberCores = 1
+numberCores = 4
 L=4
 dim = 1
 N = L**dim
@@ -41,19 +41,21 @@ def computeB_lsigma(l, sigma, config, determinants = True):
     if(determinants==True):
         K = ha.buildK()
         #check if there is a better way to calculate the matrix exponential
-        tmp1 = la.expm(deltaTau*K)
+        tmp1 = la.expm(-1*deltaTau*K)
         V_l = ha.buildV_l(l=l, config=config)
         #V_l is diagonal -> more effective way to calculate exp
-        tmp2 = la.expm(sigma*v*V_l)
+        #Don't know, if I have to use -sigma*v*V_l or +sigma*v*V_l
+        tmp2 = la.expm(-1*sigma*v*V_l)
         B = np.dot(tmp1, tmp2)
         return B
     else:
         K = ha.buildK()
         # check if there is a better way to calculate the matrix exponential
-        tmp1 = la.expm(deltaTau * K)
+        tmp1 = la.expm(-1*deltaTau * K)
         V_l = ha.buildV_l(l=l, config=config)
         # V_l is diagonal -> more effective way to calculate exp
-        tmp2 = la.expm(sigma * lamb * V_l)
+        # Don't know, if I have to use -sigma*v*V_l or +sigma*v*V_l
+        tmp2 = la.expm(-1*sigma * lamb * V_l)
         B = np.dot(tmp1, tmp2)
         return B
 
