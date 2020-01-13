@@ -44,6 +44,12 @@ def compute_m(model, config, lamb, dtau, sigma):
     return m + bs
 
 
+def mc_loop(n_sites, n_t):
+    for i in range(n_sites):
+        for l in range(n_t):
+            yield i, l
+
+
 def warmup(model, config, dtau, lamb, sweeps=None):
     if sweeps is None:
         sweeps = int(0.5 * model.n_sites * config.n_t)
@@ -59,31 +65,30 @@ def warmup(model, config, dtau, lamb, sweeps=None):
     # QMC loop
     for sweep in range(sweeps):
         print(f"Warmup sweep: {sweep+1}/{sweeps}")
-        for i in range(model.n_sites):
-            for l in range(config.n_t):
-                # Update Configuration
-                config.update(i, l)
+        for i, l in mc_loop(model.n_sites, config.n_t):
+            # Update Configuration
+            config.update(i, l)
 
-                # Calculate m-matrices and ratio of the configurations
-                # Accept move with metropolis acceptance ratio.
-                m_up = compute_m(model, config, lamb, dtau, sigma=+1)
-                m_dn = compute_m(model, config, lamb, dtau, sigma=-1)
-                new = np.linalg.det(m_up) * np.linalg.det(m_dn)
-                ratio = new / old
-                r = np.random.rand()  # Random number between 0 and 1
-                # print(f"Probability: {ratio:.2f}")
-                # print(f"Random number: {r:.2f}")
-                if r < ratio:
-                    # Move accepted:
-                    # Continue using the new configuration
-                    old = new
-                    old_config = config.copy()
-                    # print("Move accepted!")
-                else:
-                    # Move not accepted:
-                    # Revert to the old configuration
-                    config = old_config
-                    # print("Move not accepted :(")
+            # Calculate m-matrices and ratio of the configurations
+            # Accept move with metropolis acceptance ratio.
+            m_up = compute_m(model, config, lamb, dtau, sigma=+1)
+            m_dn = compute_m(model, config, lamb, dtau, sigma=-1)
+            new = np.linalg.det(m_up) * np.linalg.det(m_dn)
+            ratio = new / old
+            r = np.random.rand()  # Random number between 0 and 1
+            # print(f"Probability: {ratio:.2f}")
+            # print(f"Random number: {r:.2f}")
+            if r < ratio:
+                # Move accepted:
+                # Continue using the new configuration
+                old = new
+                old_config = config.copy()
+                # print("Move accepted!")
+            else:
+                # Move not accepted:
+                # Revert to the old configuration
+                config = old_config
+                # print("Move not accepted :(")
     return config
 
 
@@ -105,37 +110,36 @@ def measure_gf(model, config, dtau, lamb, sweeps=3200):
     number = 0
     for sweep in range(sweeps):
         print(f"Measurement sweep: {sweep + 1}/{sweeps}")
-        for i in range(model.n_sites):
-            for l in range(config.n_t):
-                # Update Configuration
-                config.update(i, l)
-                # Calculate m-matrices and ratio of the configurations
-                # Accept move with metropolis acceptance ratio.
-                m_up = compute_m(model, config, lamb, dtau, sigma=+1)
-                m_dn = compute_m(model, config, lamb, dtau, sigma=-1)
-                new = np.linalg.det(m_up) * np.linalg.det(m_dn)
-                ratio = new / old
-                r = np.random.rand()  # Random number between 0 and 1
-                # print(f"Probability: {ratio:.2f}")
-                # print(f"Random number: {r:.2f}")
-                if r < ratio:
-                    # Move accepted:
-                    # Continue using the new configuration and update temp greens function
-                    old = new
-                    old_config = config.copy()
-                    g_tmp_up = np.linalg.inv(m_up)
-                    g_tmp_dn = np.linalg.inv(m_dn)
-                    # print("Move accepted!")
-                else:
-                    # Move not accepted:
-                    # Revert to the old configuration
-                    config = old_config
-                    # print("Move not accepted :(")
+        for i, l in mc_loop(model.n_sites, config.n_t):
+            # Update Configuration
+            config.update(i, l)
+            # Calculate m-matrices and ratio of the configurations
+            # Accept move with metropolis acceptance ratio.
+            m_up = compute_m(model, config, lamb, dtau, sigma=+1)
+            m_dn = compute_m(model, config, lamb, dtau, sigma=-1)
+            new = np.linalg.det(m_up) * np.linalg.det(m_dn)
+            ratio = new / old
+            r = np.random.rand()  # Random number between 0 and 1
+            # print(f"Probability: {ratio:.2f}")
+            # print(f"Random number: {r:.2f}")
+            if r < ratio:
+                # Move accepted:
+                # Continue using the new configuration and update temp greens function
+                old = new
+                old_config = config.copy()
+                g_tmp_up = np.linalg.inv(m_up)
+                g_tmp_dn = np.linalg.inv(m_dn)
+                # print("Move accepted!")
+            else:
+                # Move not accepted:
+                # Revert to the old configuration
+                config = old_config
+                # print("Move not accepted :(")
 
-                # Add temp greens function to total gf after each step
-                gf_up += g_tmp_up
-                gf_dn += g_tmp_dn
-                number += 1
+            # Add temp greens function to total gf after each step
+            gf_up += g_tmp_up
+            gf_dn += g_tmp_dn
+            number += 1
     # Return the normalized gfs for each spin
     return np.array([gf_up, gf_dn]) / number
 
@@ -160,8 +164,8 @@ def main():
     model.build(n_sites)
 
     config = Configuration(model.n_sites, n_tau)
-    config = warmup(model, config, dtau, lamb, sweeps=500)
-    gf = measure_gf(model, config, dtau, lamb, sweeps=1000)
+    config = warmup(model, config, dtau, lamb, sweeps=100)
+    gf = measure_gf(model, config, dtau, lamb, sweeps=200)
 
     n_up, n_dn = filling(gf[0]), filling(gf[1])
     print()
