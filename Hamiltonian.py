@@ -1,6 +1,6 @@
 import numpy as np
 
-#builds Hubbard matrix
+#builds Hubbard matrix: H=-t*sum(c_i*c_j)+(U/2-mu)*sum(c_i*c_i)+U*sum((n_i,up - 1/2)*(n_i,down-1/2))
 class Hamiltonian:
 
     def __init__(self, L, U, t, mu, dim=1):
@@ -25,8 +25,6 @@ class Hamiltonian:
         edges.append([L-1,0])
         sites.append(L-1)
         #print(edges)
-        #print(edges[2])
-        #print(len(edges))
         #print(sites)
         graph = (edges, sites)
         return graph
@@ -57,7 +55,6 @@ class Hamiltonian:
             tmp  = sites[i]
             K[tmp, tmp] = U/2 - mu
             K[tmp, tmp] = U / 2 - mu
-
         #print('K = ')
         #print(K)
         return K

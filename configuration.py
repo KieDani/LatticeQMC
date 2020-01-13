@@ -4,8 +4,6 @@ import numpy as np
 class Configuration:
 
 
-
-
     #N...number lattice sites; T...number time slices (per site)
     def __init__(self, N, T, seed=123):
         np.random.seed(seed)

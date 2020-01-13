@@ -8,19 +8,19 @@ import configuration
 import Hamiltonian as Ha
 
 #not used yet
-numberCores = 4
+numberCores = 1
 L=4
 dim = 1
 N = L**dim
-T = 4.
+T = 2.
 kB = 1.38064852e-23
 #not used yet!!!
-beta = 1/(T * kB)
+#beta = 1/(T * kB)
 stepsize = 25
 deltaTau = T/stepsize
 U = 2
 t = 1
-mu = 2
+mu = U/2.
 #Unterschied zwischen Vorlesung und Paper
 v = np.arccosh(np.exp(U*deltaTau/2.))
 lamb = v
@@ -36,22 +36,6 @@ print(t*U*deltaTau**2)
 
 
 
-
-
-#I don't know if I have to use dot or *
-def mult(A,B, dot=True):
-    if(dot==True):
-        return np.dot(A,B)
-    else:
-        return A*B
-
-
-def MCsweep(l, t, L, conf):
-    conf.update(n=l, t=t)
-
-
-
-
 #use the lecture way if determinants=False
 def computeB_lsigma(l, sigma, config, determinants = True):
     if(determinants==True):
@@ -61,7 +45,7 @@ def computeB_lsigma(l, sigma, config, determinants = True):
         V_l = ha.buildV_l(l=l, config=config)
         #V_l is diagonal -> more effective way to calculate exp
         tmp2 = la.expm(sigma*v*V_l)
-        B = mult(tmp1, tmp2)
+        B = np.dot(tmp1, tmp2)
         return B
     else:
         K = ha.buildK()
@@ -70,7 +54,7 @@ def computeB_lsigma(l, sigma, config, determinants = True):
         V_l = ha.buildV_l(l=l, config=config)
         # V_l is diagonal -> more effective way to calculate exp
         tmp2 = la.expm(sigma * lamb * V_l)
-        B = mult(tmp1, tmp2)
+        B = np.dot(tmp1, tmp2)
         return B
 
 
@@ -86,7 +70,7 @@ def computeM_sigma(sigma, config, determinants = True):
     lmax -= 1
     while (lmax >= 0):
         B = computeB_lsigma(l=lmax, sigma=sigma, config=config, determinants=determinants)
-        Bs = mult(Bs, B)
+        Bs = np.dot(Bs, B)
         lmax -= 1
     M = M + Bs
     return M
@@ -99,53 +83,6 @@ def computeG_sigma(sigma, M_sigma):
     #print(G)
     return G
 
-#Probability of acceptance of a spinfilp at site i and time l
-def computeProbability(i, l, G_up, G_down, config):
-    #look at definition of v again
-    d_up = 1+(1-G_up[i,i])*(np.exp(-2*v*config[i,l])-1)
-    d_down = 1+(1-G_down[i,i])*(np.exp(2*v*config[i,l])-1)
-    return d_up+d_down
-
-
-
-
-
-#config = conf.get()
-#computeB_lsigma(2, 1, config)
-#computeM_sigma(1,config)
-
-
-def computeProbability_determinants():
-    conf = configuration.Configuration(N=N, T=stepsize, seed=1234)
-    config = conf.get()
-    #x = computeM_sigma(sigma=1, config=config)
-    a = np.linalg.det(computeM_sigma(sigma=+1, config=config))*np.linalg.det(computeM_sigma(sigma=-1, config=config))
-    #print(np.linalg.det(computeM_sigma(sigma=-1, config=config)))
-    conf.update(1,34)
-    config = conf.get()
-    b = np.linalg.det(computeM_sigma(sigma=+1, config=config))*np.linalg.det(computeM_sigma(sigma=-1, config=config))
-    y= computeM_sigma(sigma=1, config = config)
-    #print('Ergebnis')
-    print(b/a)
-    print(x-y)
-
-
-#computeProbability_determinants()
-
-def computeProbability_intelligent():
-    conf = configuration.Configuration(N=N, T=stepsize, seed=1234)
-    config = conf.get()
-    M_up = computeM_sigma(sigma=+1, config=config)
-    M_down = computeM_sigma(sigma=-1, config=config)
-    G_up = computeG_sigma(sigma=+1,M_sigma=M_up)
-    G_down = computeG_sigma(sigma=-1, M_sigma=M_down)
-    i = 1
-    l = 34
-    p = computeProbability(i=i, l=l, G_up=G_up, G_down=G_down, config=config)
-    print('Probability = ' + str(p))
-
-
-#computeProbability_intelligent()
 
 def warmup(sweeps=int(0.5*N*stepsize), seed=1234, determinants=True):
     if(determinants==True):
@@ -355,8 +292,8 @@ def measure(thermalization, sweeps, determinants=True):
         G_up = G_up/numberCores
         G_down = G_down/numberCores
     print('saving')
-    np.savetxt('G_up_U' + str(U) + 't' + str(t) + 'mu' + str(mu) + 'T' + str(T) + 'step' + str(stepsize) + 'det' + str(determinants) + '.txt', G_up)
-    np.savetxt('G_down_U' + str(U) + 't' + str(t) + 'mu' + str(mu) + 'T' + str(T) + 'step' + str(stepsize) + 'det' + str(determinants) + '.txt', G_down)
+    np.savetxt('G_up_N' + str(N) + 'U' + str(U) + 't' + str(t) + 'mu' + str(mu) + 'T' + str(T) + 'step' + str(stepsize) + 'det' + str(determinants) + '.txt', G_up)
+    np.savetxt('G_down_N' + str(N) + 'U' + str(U) + 't' + str(t) + 'mu' + str(mu) + 'T' + str(T) + 'step' + str(stepsize) + 'det' + str(determinants) + '.txt', G_down)
     return G_up, G_down
 
 
@@ -369,6 +306,7 @@ def calculateDOS_i_sigma(G_sigma):
     return DOS_sigma
 
 
+#not working at the moment!
 #only working for simple chain. Use definition of lattice in future
 def DFT(k, DOS_sigma):
     #lattice constant
@@ -385,37 +323,20 @@ def DFT(k, DOS_sigma):
 
 
 
-#G_up, G_down = measure(thermalization=100, sweeps=1200, determinants=False)
-#G_up, G_down = measure(thermalization=100, sweeps=1200, determinants=True)
+G_up, G_down = measure(thermalization=500, sweeps=3200, determinants=True)
+G_up, G_down = measure(thermalization=500, sweeps=3200, determinants=False)
 #np.savetxt('G_up.txt', G_up)
 #np.savetxt('G_down.txt', G_down)
 
-G_up = np.loadtxt('G_up_U2t1mu2T4.0step25detFalse.txt')
-G_down = np.loadtxt('G_down_U2t1mu2T4.0step25detFalse.txt')
-#
+# G_up = np.loadtxt('G_up_U2t1mu2T4.0step25detFalse.txt')
+# G_down = np.loadtxt('G_down_U2t1mu2T4.0step25detFalse.txt')
 # print(G_up)
 # print(G_down)
-#
-DOS_up = calculateDOS_i_sigma(G_up)
-print('DOS up')
-print(DOS_up)
-print(np.sum(DOS_up))
-DOS_down = calculateDOS_i_sigma(G_down)
-print('DOS down')
-print(DOS_down)
-print(np.sum(DOS_down))
-#
-# k = np.linspace(0, np.pi, 100)
-# DOS_k = DFT(k, DOS_up)
-# print('DOS')
-# print(DOS_k)
-
-
-
-# conf = configuration.Configuration(N=N, T=stepsize, seed=1234)
-# config=conf.get()
-# M_det = computeM_sigma(sigma=+1, config=config, determinants=True)
-# M_int = computeM_sigma(sigma=+1, config=config, determinants=False)
-# print(M_det)
-# print('')
-# print(M_int)
+# DOS_up = calculateDOS_i_sigma(G_up)
+# print('DOS up')
+# print(DOS_up)
+# print(np.sum(DOS_up))
+# DOS_down = calculateDOS_i_sigma(G_down)
+# print('DOS down')
+# print(DOS_down)
+# print(np.sum(DOS_down))
