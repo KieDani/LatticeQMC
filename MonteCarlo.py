@@ -15,9 +15,9 @@ N = L**dim
 T = 1.
 kB = 1.38064852e-23
 #not used yet!!!
-#beta = 1/(T * kB)
+beta = 1/(T)
 stepsize = 30
-deltaTau = T/stepsize
+deltaTau = beta/stepsize
 U = 2
 t = 1
 mu = U/2.
@@ -41,21 +41,21 @@ def computeB_lsigma(l, sigma, config, determinants = True):
     if(determinants==True):
         K = ha.buildK()
         #check if there is a better way to calculate the matrix exponential
-        tmp1 = la.expm(-1*deltaTau*K)
+        tmp1 = la.expm(deltaTau*K)
         V_l = ha.buildV_l(l=l, config=config)
         #V_l is diagonal -> more effective way to calculate exp
         #Don't know, if I have to use -sigma*v*V_l or +sigma*v*V_l
-        tmp2 = la.expm(-1*sigma*v*V_l)
+        tmp2 = la.expm(sigma*v*V_l)
         B = np.dot(tmp1, tmp2)
         return B
     else:
         K = ha.buildK()
         # check if there is a better way to calculate the matrix exponential
-        tmp1 = la.expm(-1*deltaTau * K)
+        tmp1 = la.expm(deltaTau * K)
         V_l = ha.buildV_l(l=l, config=config)
         # V_l is diagonal -> more effective way to calculate exp
         # Don't know, if I have to use -sigma*v*V_l or +sigma*v*V_l
-        tmp2 = la.expm(-1*sigma * lamb * V_l)
+        tmp2 = la.expm(sigma * lamb * V_l)
         B = np.dot(tmp1, tmp2)
         return B
 
@@ -63,9 +63,7 @@ def computeB_lsigma(l, sigma, config, determinants = True):
 
 #use the lecture way if determinants=False
 def computeM_sigma(sigma, config, determinants = True):
-    M = np.zeros((N,N), dtype=np.float64)
-    for i in range(1,N):
-        M[i,i] = 1.
+    M = np.eye(N, dtype=np.float64)
 
     lmax = stepsize - 1
     Bs = computeB_lsigma(l=lmax, sigma=sigma, config=config, determinants=determinants)
@@ -131,7 +129,7 @@ def warmup(sweeps=int(0.5*N*stepsize), seed=1234, determinants=True):
         conf = configuration.Configuration(N=N, T=stepsize, seed=seed)
         config = conf.get()
         G_up = np.linalg.inv(computeM_sigma(sigma=+1, config=config, determinants=determinants))
-        G_down = np.linalg.inv(computeM_sigma(sigma=+1, config=config, determinants=determinants))
+        G_down = np.linalg.inv(computeM_sigma(sigma=-1, config=config, determinants=determinants))
         for a in range(0, sweeps):
             for i in range(0,N):
                 for l in range(0,stepsize):
@@ -231,7 +229,7 @@ def measureG(sweeps, thermalization=int(0.5*N*stepsize), seed=1234, determinants
         G_up2 = 0
         G_down2 = 0
         G_up = np.linalg.inv(computeM_sigma(sigma=+1, config=config, determinants=determinants))
-        G_down = np.linalg.inv(computeM_sigma(sigma=+1, config=config, determinants=determinants))
+        G_down = np.linalg.inv(computeM_sigma(sigma=-1, config=config, determinants=determinants))
         for a in range(0, sweeps):
             for i in range(0,N):
                 for l in range(0,stepsize):
@@ -325,20 +323,18 @@ def DFT(k, DOS_sigma):
 
 
 
-G_up, G_down = measure(thermalization=2000, sweeps=10000, determinants=True)
-G_up, G_down = measure(thermalization=2000, sweeps=10000, determinants=False)
-#np.savetxt('G_up.txt', G_up)
-#np.savetxt('G_down.txt', G_down)
+#G_up, G_down = measure(thermalization=50, sweeps=500, determinants=True)
+G_up, G_down = measure(thermalization=50, sweeps=500, determinants=False)
 
-# G_up = np.loadtxt('G_up_N4U2t1mu1.0T2.0step25detTrue.txt')
-# G_down = np.loadtxt('G_down_N4U2t1mu1.0T2.0step25detTrue.txt')
+G_up = np.loadtxt('G_up_N5U2t1mu1.0T1.0step30detFalse.txt')
+G_down = np.loadtxt('G_down_N5U2t1mu1.0T1.0step30detFalse.txt')
 # print(G_up)
 # print(G_down)
-# DOS_up = calculateDOS_i_sigma(G_up)
-# print('DOS up')
-# print(DOS_up)
-# print(np.sum(DOS_up))
-# DOS_down = calculateDOS_i_sigma(G_down)
-# print('DOS down')
-# print(DOS_down)
-# print(np.sum(DOS_down))
+DOS_up = calculateDOS_i_sigma(G_up)
+print('DOS up')
+print(DOS_up)
+print(np.sum(DOS_up))
+DOS_down = calculateDOS_i_sigma(G_down)
+print('DOS down')
+print(DOS_down)
+print(np.sum(DOS_down))
