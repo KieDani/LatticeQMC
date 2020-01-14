@@ -1,11 +1,9 @@
 import numpy as np
-import scipy as sp
 import scipy.linalg as la
 from multiprocessing import Pool
 import multiprocessing
 import functools
-import configuration
-import hubbard as Ha
+from lqmc import hubbard as Ha, configuration
 
 #not used yet
 numberCores = 1

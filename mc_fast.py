@@ -4,12 +4,21 @@ Created on 13 Jan 2020
 
 project: LatticeQMC
 version: 1.0
+
+To do
+-----
+Multiproccesing
+outer measure function
+
+
 """
 import sys
+import time
 import numpy as np
 from scipy.linalg import expm
-from hubbard import HubbardModel
-from configuration import Configuration
+from lqmc import HubbardModel, Configuration
+# from lqmc.hubbard import HubbardModel
+# from lqmc.configuration import Configuration
 
 
 def stdout(string):
@@ -30,9 +39,8 @@ def assert_params(u, t, dtau, verbose=True):
         print("OK!")
 
 
-def compute_m(model, config, lamb, dtau, sigma):
-    ham = model.ham_kinetic()
-    n = model.n_sites
+def compute_m(ham, config, lamb, dtau, sigma):
+    n = ham.shape[0]
 
     # Calculate the first matrix exp of B. This is a static value.
     # check if there is a better way to calculate the matrix exponential
@@ -40,7 +48,7 @@ def compute_m(model, config, lamb, dtau, sigma):
     # Create the V_l matrix
     v = np.zeros((n, n), dtype=config.dtype)
 
-    # fill diag(V_l) with values of last time slice and compute B
+    # fill diag(V_l) with values of last time slice and compute B-product
     lmax = config.n_t - 1
     np.fill_diagonal(v, config[:, lmax])
     exp_v = expm(sigma * lamb * v)
@@ -69,39 +77,43 @@ def warmup(model, config, dtau, lamb, sweeps=None):
     if sweeps is None:
         sweeps = int(0.5 * model.n_sites * config.n_t)
 
+    ham = model.ham_kinetic()
+    print(ham)
     # Calculate m-matrices
-    m_up = compute_m(model, config, lamb, dtau, sigma=+1)
-    m_dn = compute_m(model, config, lamb, dtau, sigma=-1)
+    m_up = compute_m(ham, config, lamb, dtau, sigma=+1)
+    m_dn = compute_m(ham, config, lamb, dtau, sigma=-1)
     old = np.linalg.det(m_up) * np.linalg.det(m_dn)
 
     # Store copy of current configuration
     old_config = config.copy()
-
+    acc = False
     # QMC loop
     stdout("Warmup sweep")
     for sweep in range(sweeps):
-        clear_line(100)
-        stdout(f"Warmup sweep: {sweep+1}/{sweeps}")
         for i, l in mc_loop(model.n_sites, config.n_t):
+            clear_line(100)
+            stdout(f"Warmup sweep: {sweep+1}/{sweeps}, accepted: {acc}")
             # Update Configuration
             config.update(i, l)
 
             # Calculate m-matrices and ratio of the configurations
             # Accept move with metropolis acceptance ratio.
-            m_up = compute_m(model, config, lamb, dtau, sigma=+1)
-            m_dn = compute_m(model, config, lamb, dtau, sigma=-1)
+            m_up = compute_m(ham, config, lamb, dtau, sigma=+1)
+            m_dn = compute_m(ham, config, lamb, dtau, sigma=-1)
             new = np.linalg.det(m_up) * np.linalg.det(m_dn)
             ratio = new / old
             r = np.random.rand()  # Random number between 0 and 1
             # print(f"Probability: {ratio:.2f}")
             # print(f"Random number: {r:.2f}")
             if r < ratio:
+                acc = True
                 # Move accepted:
                 # Continue using the new configuration
                 old = new
                 old_config = config.copy()
                 # print("Move accepted!")
             else:
+                acc = False
                 # Move not accepted:
                 # Revert to the old configuration
                 config = old_config
@@ -111,9 +123,10 @@ def warmup(model, config, dtau, lamb, sweeps=None):
 
 
 def measure_gf(model, config, dtau, lamb, sweeps=3200):
+    ham = model.ham_kinetic()
     # Calculate m-matrices
-    m_up = compute_m(model, config, lamb, dtau, sigma=+1)
-    m_dn = compute_m(model, config, lamb, dtau, sigma=-1)
+    m_up = compute_m(ham, config, lamb, dtau, sigma=+1)
+    m_dn = compute_m(ham, config, lamb, dtau, sigma=-1)
     old = np.linalg.det(m_up) * np.linalg.det(m_dn)
 
     # Initialize total and temp greens functions
@@ -135,8 +148,8 @@ def measure_gf(model, config, dtau, lamb, sweeps=3200):
             config.update(i, l)
             # Calculate m-matrices and ratio of the configurations
             # Accept move with metropolis acceptance ratio.
-            m_up = compute_m(model, config, lamb, dtau, sigma=+1)
-            m_dn = compute_m(model, config, lamb, dtau, sigma=-1)
+            m_up = compute_m(ham, config, lamb, dtau, sigma=+1)
+            m_dn = compute_m(ham, config, lamb, dtau, sigma=-1)
             new = np.linalg.det(m_up) * np.linalg.det(m_dn)
             ratio = new / old
             r = np.random.rand()  # Random number between 0 and 1
@@ -166,7 +179,7 @@ def measure_gf(model, config, dtau, lamb, sweeps=3200):
 
 
 def save(model, t, n_t, gf):
-    file = f"data\\gf_t={t}_nt={n_t}_{model.param_str()}"
+    file = f"data\\gf2_t={t}_nt={n_t}_{model.param_str()}"
     np.save(file, gf)
 
 
@@ -175,9 +188,12 @@ def filling(g_sigma):
 
 
 def main(calc=True):
-    n_sites = 4
+    temp = 2
+    beta = 1 / temp
+
+    n_sites = 20
     u, t = 2, 1
-    tau = 2
+    tau = beta
     n_tau = 10
 
     if calc:
@@ -190,13 +206,19 @@ def main(calc=True):
         model = HubbardModel(u=u, t=t, mu=u / 2)
         model.build(n_sites)
 
+        t0 = time.time()
+
         config = Configuration(model.n_sites, n_tau)
-        config = warmup(model, config, dtau, lamb, sweeps=500)
-        gf = measure_gf(model, config, dtau, lamb, sweeps=200)
+        config = warmup(model, config, dtau, lamb, sweeps=100)
+        gf = measure_gf(model, config, dtau, lamb, sweeps=100)
+
+        t = time.time() - t0
+        mins, secs = divmod(t, 60)
+        print(f"Total time: {int(mins):0>2}:{int(secs):0>2} min")
         print()
         save(model, tau, n_tau, gf)
     else:
-        gf = np.load("data\\gf_t=2_nt=10_u=2_t=1_mu=1.0.npy")
+        gf = np.load("data\\gf_t=2_nt=20_u=2_t=1_mu=1.0.npy")
 
     n_up, n_dn = filling(gf[0]), filling(gf[1])
 
@@ -206,4 +228,4 @@ def main(calc=True):
 
 
 if __name__ == "__main__":
-    main(calc=False)
+    main(calc=True)

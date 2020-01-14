@@ -6,7 +6,7 @@ project: LatticeQMC
 version: 1.0
 """
 import numpy as np
-from lattice import Lattice
+from .lattice import Lattice
 
 
 class HubbardModel:
@@ -32,11 +32,13 @@ class HubbardModel:
     def build(self, width, height=1):
         self.lattice.build((width, height))
 
-    def ham_kinetic(self, cycling=True):
+    def ham_kinetic(self, cycling=False):
         n = self.lattice.n_sites
+
         # Create hamiltonian with diagonal elements
         energy = self.u/2 - self.mu
         ham = energy * np.eye(n, dtype=np.float64)
+
         # Add hopping terms
         # i is the index of the current site. The lattice
         # returns the second index, j, which corresponds to
@@ -44,21 +46,11 @@ class HubbardModel:
         # H_ij = t, H_ji = t^*
         for i in range(n):
             for j in self.lattice.nearest_neighbours(i):
-                ham[i, j] = self.t
-                ham[j, i] = np.conj(self.t)
+                ham[i, j] = -self.t
+                ham[j, i] = -np.conj(self.t)
+
         if cycling:
             i, j = 0, -1
             ham[i, j] = -self.t
             ham[j, i] = np.conj(-self.t)
         return ham
-
-    def build_v(self, l, config):
-        n = self.n_sites
-        v_l = np.zeros((n, n), dtype=np.int8)
-        # Spins at time slice l
-        h = config[:, l]
-        for i in range(0, n):
-            v_l[i, i] = h[i]
-        # print('V_' + str(l) + ' = ')
-        # print(V_l)
-        return v_l
