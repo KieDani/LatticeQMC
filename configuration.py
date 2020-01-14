@@ -23,8 +23,12 @@ class Configuration:
         """
         self.n = n
         self.n_t = n_t
-        self.config = np.zeros((n, n_t))
+        self.config = np.zeros((n, n_t), dtype=np.int8)
         self.initialize()
+
+    @property
+    def dtype(self):
+        return self.config.dtype
 
     def copy(self):
         """ Copies the configuration instance

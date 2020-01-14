@@ -19,6 +19,9 @@ class HubbardModel:
 
         self.graph = None
 
+    def param_str(self):
+        return f"u={self.u}_t={self.t}_mu={self.mu}"
+
     def __str__(self):
         return f"HubbardModel(u={self.u}, t={self.t}, mu={self.mu})"
 
@@ -29,7 +32,7 @@ class HubbardModel:
     def build(self, width, height=1):
         self.lattice.build((width, height))
 
-    def ham_kinetic(self):
+    def ham_kinetic(self, cycling=True):
         n = self.lattice.n_sites
         # Create hamiltonian with diagonal elements
         energy = self.u/2 - self.mu
@@ -43,6 +46,10 @@ class HubbardModel:
             for j in self.lattice.nearest_neighbours(i):
                 ham[i, j] = self.t
                 ham[j, i] = np.conj(self.t)
+        if cycling:
+            i, j = 0, -1
+            ham[i, j] = -self.t
+            ham[j, i] = np.conj(-self.t)
         return ham
 
     def build_v(self, l, config):
