@@ -32,7 +32,7 @@ class HubbardModel:
     def build(self, width, height=1):
         self.lattice.build((width, height))
 
-    def ham_kinetic(self, cycling=False):
+    def ham_kinetic(self, cycling=True):
         n = self.lattice.n_sites
 
         # Create hamiltonian with diagonal elements

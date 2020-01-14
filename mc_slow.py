@@ -4,10 +4,17 @@ Created on 13 Jan 2020
 
 project: LatticeQMC
 version: 1.0
+
+To do
+-----
+- Multiproccesing
+- Outer measure function
+- Logging
+- M-matrix inner func (??)
 """
 import time
-import numpy as np
 import itertools
+import numpy as np
 from scipy.linalg import expm
 from lqmc import HubbardModel, Configuration
 
@@ -60,16 +67,19 @@ def mc_loop(n_sites, n_t):
 def warmup(model, config, dtau, lamb, sweeps=200):
     ham_kin = model.ham_kinetic()
 
+    # Calculate m-matrices
+    m_up = compute_m(ham_kin, config, lamb, dtau, sigma=+1)
+    m_dn = compute_m(ham_kin, config, lamb, dtau, sigma=-1)
+    old = np.linalg.det(m_up) * np.linalg.det(m_dn)
+
     # Store copy of current configuration
     old_config = config.copy()
-
-    # QMC loop
     acc = False
-    ratio = 0
+    # QMC loop
     updateln("Warmup sweep")
     for sweep in range(sweeps):
         for i, l in itertools.product(range(model.n_sites), range(config.n_t)):
-            updateln(f"Warmup sweep: {sweep+1}/{sweeps}, accepted: {acc} (ratio={ratio:.2f})")
+            updateln(f"Warmup sweep: {sweep+1}/{sweeps}, accepted: {acc}")
             # Update Configuration
             config.update(i, l)
 
@@ -77,14 +87,14 @@ def warmup(model, config, dtau, lamb, sweeps=200):
             # Accept move with metropolis acceptance ratio.
             m_up = compute_m(ham_kin, config, lamb, dtau, sigma=+1)
             m_dn = compute_m(ham_kin, config, lamb, dtau, sigma=-1)
-            d_up = 1 + (1 - np.linalg.inv(m_up)[i, i]) * (np.exp(-2 * lamb * config[i, l]) - 1)
-            d_dn = 1 + (1 - np.linalg.inv(m_dn)[i, i]) * (np.exp(+2 * lamb * config[i, l]) - 1)
-            ratio = d_up + d_dn
+            new = np.linalg.det(m_up) * np.linalg.det(m_dn)
+            ratio = new / old
             r = np.random.rand()  # Random number between 0 and 1
             if r < ratio:
                 # Move accepted:
                 # Continue using the new configuration
                 acc = True
+                old = new
                 old_config = config.copy()
             else:
                 # Move not accepted:
@@ -97,11 +107,11 @@ def warmup(model, config, dtau, lamb, sweeps=200):
 
 def measure_gf(model, config, dtau, lamb, sweeps=800):
     ham_kin = model.ham_kinetic()
-    n = model.n_sites
 
     # Calculate m-matrices
     m_up = compute_m(ham_kin, config, lamb, dtau, sigma=+1)
     m_dn = compute_m(ham_kin, config, lamb, dtau, sigma=-1)
+    old = np.linalg.det(m_up) * np.linalg.det(m_dn)
 
     # Initialize total and temp greens functions
     gf_up, gf_dn = 0, 0
@@ -120,32 +130,21 @@ def measure_gf(model, config, dtau, lamb, sweeps=800):
             updateln(f"Measurement sweep: {sweep+1}/{sweeps}, accepted: {acc}")
             # Update Configuration
             config.update(i, l)
-
             # Calculate m-matrices and ratio of the configurations
             # Accept move with metropolis acceptance ratio.
             m_up = compute_m(ham_kin, config, lamb, dtau, sigma=+1)
             m_dn = compute_m(ham_kin, config, lamb, dtau, sigma=-1)
-            d_up = 1 + (1 - np.linalg.inv(m_up)[i, i]) * (np.exp(-2 * lamb * config[i, l]) - 1)
-            d_dn = 1 + (1 - np.linalg.inv(m_dn)[i, i]) * (np.exp(+2 * lamb * config[i, l]) - 1)
-            ratio = d_up + d_dn
+            new = np.linalg.det(m_up) * np.linalg.det(m_dn)
+            ratio = new / old
             r = np.random.rand()  # Random number between 0 and 1
             if r < ratio:
                 # Move accepted:
                 # Update temp greens function and continue using the new configuration
-                c_up = np.zeros(n, dtype=np.float64)
-                c_dn = np.zeros(n, dtype=np.float64)
-                c_up[i] = np.exp(-2 * lamb * config[i, l]) - 1
-                c_dn[i] = np.exp(+2 * lamb * config[i, l]) - 1
-                c_up = -1 * (np.exp(-2 * lamb * config[i, l]) - 1) * g_tmp_up[i, :] + c_up
-                c_dn = -1 * (np.exp(+2 * lamb * config[i, l]) - 1) * g_tmp_dn[i, :] + c_dn
-
-                b_up = g_tmp_up[:, i] / (1. + c_up[i])
-                b_dn = g_tmp_dn[:, i] / (1. + c_dn[i])
-
-                g_tmp_up = g_tmp_up - np.outer(b_up, c_up)
-                g_tmp_dn = g_tmp_dn - np.outer(b_dn, c_dn)
+                g_tmp_up = np.linalg.inv(m_up)
+                g_tmp_dn = np.linalg.inv(m_dn)
 
                 acc = True
+                old = new
                 old_config = config.copy()
             else:
                 # Move not accepted:
@@ -178,15 +177,14 @@ def measure(u, t, beta, n_tau, n_sites):
 
     t0 = time.time()
     config = Configuration(model.n_sites, n_tau)
-    config = warmup(model, config, dtau, lamb, sweeps=100)
-    gf = measure_gf(model, config, dtau, lamb, sweeps=200)
+    config = warmup(model, config, dtau, lamb, sweeps=200)
+    gf = measure_gf(model, config, dtau, lamb, sweeps=800)
     t = time.time() - t0
-
-    # save(model, beta, n_tau, gf)
 
     mins, secs = divmod(t, 60)
     print(f"Total time: {int(mins):0>2}:{int(secs):0>2} min")
     print()
+    save(model, beta, n_tau, gf)
     return gf
 
 
