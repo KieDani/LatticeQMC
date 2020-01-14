@@ -8,8 +8,6 @@ version: 1.0
 To do
 -----
 - Multiproccesing
-- Outer measure function
-- Logging
 - M-matrix inner func (??)
 """
 import time
@@ -17,13 +15,39 @@ import itertools
 import numpy as np
 from scipy.linalg import expm
 from lqmc import HubbardModel, Configuration
+import logging
+
+# Configure basic logging for lqmc-loop
+log_file = 'data\\lqmc_slow.log'
+logging.basicConfig(filename=log_file, filemode="w", format='%(message)s', level=logging.DEBUG)
 
 
 def updateln(string):
+    """ Rewrites the current console line
+
+    Parameters
+    ----------
+    string: str
+        String to display.
+    """
     print("\r" + string, end="", flush=True)
 
 
 def check_params(u, t, dtau):
+    r""" Checks the configuration of the model and HS-field.
+
+    .. math::
+        U t \Delta\tau < \frac{1}{10}
+
+    Parameters
+    ----------
+    u: float
+        Hubbard interaction :math:`U`.
+    t: float
+        Hopping parameter :math:'t'.
+    dtau: float
+        Time slice size of the HS-field.
+    """
     check_val = u * t * dtau**2
     if check_val < 0.1:
         print(f"Check-value {check_val:.2f} is smaller than 0.1!")
@@ -32,6 +56,37 @@ def check_params(u, t, dtau):
 
 
 def compute_m(ham_kin, config, lamb, dtau, sigma):
+    r""" Computes the matrix :math:'M' used in the Metropolis ratio
+
+    The matrix :math:'M' is defined as
+    .. math::
+       M_\sigma(h) = I + B_{L, \sigma}(h_{L}) B_{L-1, \sigma}(h_{L-1}) \dots B_{1, \sigma}(h_{1})
+
+    with
+    .. math::
+       B_{l, \sigma}(h_l) = e^{\Delta\tau K} e^{\sigma \lambda V_l(h_l)}
+
+    .math'V_l(h_l) = diag(h_{1l}, \dots h_{Nl})' is the diagonal matrix of a time slice
+    of the HS-field .math'h_{il}'
+
+    Parameters
+    ----------
+    ham_kin: (N, N) np.ndarray
+        Kinetic hamiltonian .math'K'.
+    config: Configuration
+        The current HS-field configuration object.
+        This contains the field .math'h_{il}'
+    lamb: float
+        Factor .math'\lambda'.
+    dtau: float
+        Time slice size of the HS-field.
+    sigma: int
+        Spin index.
+
+    Returns
+    -------
+    m: (N, N) np.ndarray
+    """
     n = ham_kin.shape[0]
 
     # Calculate the first matrix exp of B. This is a static value.
@@ -42,6 +97,7 @@ def compute_m(ham_kin, config, lamb, dtau, sigma):
 
     # fill diag(V_l) with values of last time slice and compute B-product
     lmax = config.n_t - 1
+
     np.fill_diagonal(v, config[:, lmax])
     exp_v = expm(sigma * lamb * v)
     b = np.dot(exp_k, exp_v)
@@ -58,14 +114,30 @@ def compute_m(ham_kin, config, lamb, dtau, sigma):
     return np.eye(n) + b_prod
 
 
-def mc_loop(n_sites, n_t):
-    for i in range(n_sites):
-        for l in range(n_t):
-            yield i, l
+def warmup(model, config, dtau, sweeps=200):
+    """ Runs the warmup lqmc-loop
 
+    Parameters
+    ----------
+    model: HubbardModel
+        The Hubbard model instance.
+    config: Configuration
+        The current HS-field configuration object.
+        This contains the field .math'h_{il}'
+    dtau: float
+        Time slice size of the HS-field.
+    sweeps: int, optional
+        Number of sweeps through the HS-field.
 
-def warmup(model, config, dtau, lamb, sweeps=200):
+    Returns
+    -------
+    config: Configuration
+        The updated HS-field configuration after the warmup loop.
+    """
     ham_kin = model.ham_kinetic()
+
+    # Calculate factor
+    lamb = np.arccosh(np.exp(model.u * dtau / 2.))
 
     # Calculate m-matrices
     m_up = compute_m(ham_kin, config, lamb, dtau, sigma=+1)
@@ -101,12 +173,36 @@ def warmup(model, config, dtau, lamb, sweeps=200):
                 # Revert to the old configuration
                 acc = False
                 config = old_config
+
+            logging.info(f"[Warmup] Sweep={sweep} i={i}, l={l} - ratio={ratio:.3f}, accepted={acc}")
     print()
     return config
 
 
-def measure_gf(model, config, dtau, lamb, sweeps=800):
+def measure_gf(model, config, dtau, sweeps=800):
+    """ Runs the measurement lqmc-loop and returns the measured Green's function
+
+    Parameters
+    ----------
+    model: HubbardModel
+        The Hubbard model instance.
+    config: Configuration
+        The current HS-field configuration object.
+        This contains the field .math'h_{il}'
+    dtau: float
+        Time slice size of the HS-field.
+    sweeps: int, optional
+        Number of sweeps through the HS-field.
+
+    Returns
+    -------
+    gf: (2, N) np.ndarray
+        Measured Green's function .math'G' of the up- and down-spin channel.
+    """
     ham_kin = model.ham_kinetic()
+
+    # Calculate factor
+    lamb = np.arccosh(np.exp(model.u * dtau / 2.))
 
     # Calculate m-matrices
     m_up = compute_m(ham_kin, config, lamb, dtau, sigma=+1)
@@ -156,39 +252,69 @@ def measure_gf(model, config, dtau, lamb, sweeps=800):
             gf_up += g_tmp_up
             gf_dn += g_tmp_dn
             number += 1
+
+            logging.info(f"[Measure] Sweep={sweep} i={i}, l={l} - ratio={ratio:.3f}, accepted={acc}")
     print()
     # Return the normalized gfs for each spin
     return np.array([gf_up, gf_dn]) / number
 
 
-def save(model, beta, n_tau, gf):
-    file = f"data\\gf2_t={beta}_nt={n_tau}_{model.param_str()}"
+def save(model, beta, time_steps, gf):
+    """ Save data to file
+
+    To Do
+    -----
+    Improve saving and loading
+    """
+    file = f"data\\gf2_t={beta}_nt={time_steps}_{model.param_str()}"
     np.save(file, gf)
 
 
-def measure(u, t, beta, n_tau, n_sites):
-    model = HubbardModel(u=u, t=t, mu=u / 2)
-    model.build(n_sites)
-    dtau = beta / n_tau
-    check_params(u, t, dtau)
+def measure(model, beta, time_steps):
+    """ Runs the lqmc warmup and measurement loop for the given model.
 
-    lamb = np.arccosh(np.exp(u * dtau / 2.))  # Paper factor
-    # lamb = 0.5 * np.exp(-u * dtau / 4.)
+    Parameters
+    ----------
+    model: HubbardModel
+        The Hubbard model instance.
+    beta: float
+        The inverse temperature .math'\beta = 1/T'.
+    time_steps: int
+        Number of time steps from .math'0' to .math'\beta'
+
+    Returns
+    -------
+    gf: (2, N) np.ndarray
+        Measured Green's function .math'G' of the up- and down-spin channel.
+    """
+    dtau = beta / time_steps
+    check_params(model.u, model.t, dtau)
 
     t0 = time.time()
-    config = Configuration(model.n_sites, n_tau)
-    config = warmup(model, config, dtau, lamb, sweeps=200)
-    gf = measure_gf(model, config, dtau, lamb, sweeps=800)
+    config = Configuration(model.n_sites, time_steps)
+    config = warmup(model, config, dtau, sweeps=20)
+    gf = measure_gf(model, config, dtau, sweeps=80)
     t = time.time() - t0
 
     mins, secs = divmod(t, 60)
     print(f"Total time: {int(mins):0>2}:{int(secs):0>2} min")
     print()
-    save(model, beta, n_tau, gf)
+    save(model, beta, time_steps, gf)
     return gf
 
 
 def filling(g_sigma):
+    r""" Computes the local filling of the model.
+
+    Parameters
+    ----------
+    g_sigma: (N) np.ndarray
+        Green's function .math'G_{\sigma}' of a spin channel.
+
+    Returns
+    -------
+    n: (N) np.ndarray
+    """
     return 1 - np.diagonal(g_sigma)
 
 
@@ -197,12 +323,16 @@ def main():
     u, t = 2, 1
     temp = 2
     beta = 1 / temp
-    n_tau = 10
+    time_steps = 10
 
-    gf = measure(u, t, beta, n_tau, n_sites)
+    model = HubbardModel(u=u, t=t, mu=u / 2)
+    model.build(n_sites)
+
+    gf_up, gf_dn = measure(model, beta, time_steps)
     # gf = np.load("data\\gf_t=2_nt=20_u=2_t=1_mu=1.0.npy")
 
-    n_up, n_dn = filling(gf[0]), filling(gf[1])
+    n_up = filling(gf_up)
+    n_dn = filling(gf_dn)
     print(f"<n↑> = {np.mean(n_up):.3f}  {n_up}")
     print(f"<n↓> = {np.mean(n_dn):.3f}  {n_dn}")
     print(f"<n>  = {np.mean(n_up + n_dn):.3f}")
