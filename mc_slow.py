@@ -179,7 +179,7 @@ def warmup(model, config, dtau, sweeps=200):
     return config
 
 
-def measure_gf(model, config, dtau, sweeps=800):
+def measure_gf(model, config, dtau, time_steps, sweeps=800):
     """ Runs the measurement lqmc-loop and returns the measured Green's function
 
     Parameters
@@ -211,8 +211,12 @@ def measure_gf(model, config, dtau, sweeps=800):
 
     # Initialize total and temp greens functions
     gf_up, gf_dn = 0, 0
-    g_tmp_up = np.linalg.inv(m_up)
-    g_tmp_dn = np.linalg.inv(m_dn)
+    g_tmp_up_beta = np.linalg.inv(m_up)
+    g_tmp_dn_beta = np.linalg.inv(m_dn)
+    g_tmp_up = gf_tau(g_beta=g_tmp_up_beta, ham_kin=ham_kin, dtau=dtau, lamb=lamb, sigma=+1, config=config,
+                      time_steps=time_steps)
+    g_tmp_dn = gf_tau(g_beta=g_tmp_dn_beta, ham_kin=ham_kin, dtau=dtau, lamb=lamb, sigma=-1, config=config,
+                      time_steps=time_steps)
 
     # Store copy of current configuration
     old_config = config.copy()
@@ -236,8 +240,12 @@ def measure_gf(model, config, dtau, sweeps=800):
             if r < ratio:
                 # Move accepted:
                 # Update temp greens function and continue using the new configuration
-                g_tmp_up = np.linalg.inv(m_up)
-                g_tmp_dn = np.linalg.inv(m_dn)
+                g_tmp_up_beta = np.linalg.inv(m_up)
+                g_tmp_dn_beta = np.linalg.inv(m_dn)
+                g_tmp_up = gf_tau(g_beta=g_tmp_up_beta, ham_kin=ham_kin, dtau=dtau, lamb=lamb, sigma=+1, config=config,
+                                  time_steps=time_steps)
+                g_tmp_dn = gf_tau(g_beta=g_tmp_dn_beta, ham_kin=ham_kin, dtau=dtau, lamb=lamb, sigma=-1, config=config,
+                                  time_steps=time_steps)
 
                 acc = True
                 old = new
