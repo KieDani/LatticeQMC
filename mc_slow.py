@@ -179,7 +179,7 @@ def warmup(model, config, dtau, sweeps=200):
     return config
 
 
-def measure_gf(model, config, dtau, sweeps=800):
+def measure_gf(model, config, dtau, time_steps, sweeps=800):
     """ Runs the measurement lqmc-loop and returns the measured Green's function
 
     Parameters
@@ -211,8 +211,13 @@ def measure_gf(model, config, dtau, sweeps=800):
 
     # Initialize total and temp greens functions
     gf_up, gf_dn = 0, 0
-    g_tmp_up = np.linalg.inv(m_up)
-    g_tmp_dn = np.linalg.inv(m_dn)
+    g_tmp_up_beta = np.linalg.inv(m_up)
+    g_tmp_dn_beta = np.linalg.inv(m_dn)
+    #the Greensfunction for all steps is calculated out of the Greensfunction at time beta
+    g_tmp_up = gf_tau(g_beta=g_tmp_up_beta, ham_kin=ham_kin, dtau=dtau, lamb=lamb, sigma=+1, config=config,
+                      time_steps=time_steps)
+    g_tmp_dn = gf_tau(g_beta=g_tmp_dn_beta, ham_kin=ham_kin, dtau=dtau, lamb=lamb, sigma=-1, config=config,
+                      time_steps=time_steps)
 
     # Store copy of current configuration
     old_config = config.copy()
@@ -236,8 +241,12 @@ def measure_gf(model, config, dtau, sweeps=800):
             if r < ratio:
                 # Move accepted:
                 # Update temp greens function and continue using the new configuration
-                g_tmp_up = np.linalg.inv(m_up)
-                g_tmp_dn = np.linalg.inv(m_dn)
+                g_tmp_up_beta = np.linalg.inv(m_up)
+                g_tmp_dn_beta = np.linalg.inv(m_dn)
+                g_tmp_up = gf_tau(g_beta=g_tmp_up_beta, ham_kin=ham_kin, dtau=dtau, lamb=lamb, sigma=+1, config=config,
+                                  time_steps=time_steps)
+                g_tmp_dn = gf_tau(g_beta=g_tmp_dn_beta, ham_kin=ham_kin, dtau=dtau, lamb=lamb, sigma=-1, config=config,
+                                  time_steps=time_steps)
 
                 acc = True
                 old = new
@@ -257,6 +266,37 @@ def measure_gf(model, config, dtau, sweeps=800):
     print()
     # Return the normalized gfs for each spin
     return np.array([gf_up, gf_dn]) / number
+
+
+
+def gf_tau(g_beta, ham_kin, dtau, lamb, sigma, config, time_steps):
+    n = ham_kin.shape[0]
+
+    # Calculate the first matrix exp of B. This is a static value.
+    # check if there is a better way to calculate the matrix exponential
+    exp_k = expm(dtau * ham_kin)
+
+    # g[0][:,:] is Greensfunction at time beta, g[1][0:0] is Greensfunction one step before, etc
+    g=np.zeros((time_steps,n,n), dtype=np.float64)
+    # print(g[0])
+    # print('')
+    # print(g_beta)
+    g[0][:,:]= g_beta
+
+    for l in range(1,time_steps):
+        # Create the V_l matrix
+        v = np.zeros((n, n), dtype=config.dtype)
+        np.fill_diagonal(v, config[:, l])
+        exp_v = expm(sigma * lamb * v)
+        b = np.dot(exp_k, exp_v)
+        # print()
+        # print(b)
+        # print()
+        # print(np.linalg.inv(b))
+
+        g[l][:,:] = np.dot(np.dot(b, g[l-1][:,:]), np.linalg.inv(b))
+    return g
+
 
 
 def save(model, beta, time_steps, gf):
@@ -293,7 +333,7 @@ def measure(model, beta, time_steps):
     t0 = time.time()
     config = Configuration(model.n_sites, time_steps)
     config = warmup(model, config, dtau, sweeps=20)
-    gf = measure_gf(model, config, dtau, sweeps=80)
+    gf = measure_gf(model, config, dtau, time_steps=time_steps, sweeps=80)
     t = time.time() - t0
 
     mins, secs = divmod(t, 60)
@@ -360,8 +400,8 @@ def main():
     gf_up, gf_dn = measure_binned(model, beta, time_steps)
     # gf = np.load("data\\gf_t=2_nt=20_u=2_t=1_mu=1.0.npy")
 
-    n_up = filling(gf_up)
-    n_dn = filling(gf_dn)
+    n_up = filling(gf_up[0])
+    n_dn = filling(gf_dn[0])
     print(f"<n↑> = {np.mean(n_up):.3f}  {n_up}")
     print(f"<n↓> = {np.mean(n_dn):.3f}  {n_dn}")
     print(f"<n>  = {np.mean(n_up + n_dn):.3f}")
