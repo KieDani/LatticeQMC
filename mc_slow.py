@@ -11,11 +11,11 @@ To do
 - M-matrix inner func (??)
 """
 import time
+import logging
 import itertools
 import numpy as np
 from scipy.linalg import expm
 from lqmc import HubbardModel, Configuration
-import logging
 
 # Configure basic logging for lqmc-loop
 log_file = 'data\\lqmc_slow.log'
@@ -303,6 +303,35 @@ def measure(model, beta, time_steps):
     return gf
 
 
+def measure_binned(model, beta, time_steps, n_bins=10):
+    dtau = beta / time_steps
+    check_params(model.u, model.t, dtau)
+
+    t0 = time.time()
+    bins_up = np.zeros((n_bins, model.n_sites))
+    bins_dn = np.zeros((n_bins, model.n_sites))
+    for i in range(n_bins):
+        print("Bin", i+1)
+        config = Configuration(model.n_sites, time_steps)
+        config = warmup(model, config, dtau, sweeps=20)
+        gf_up, gf_dn = measure_gf(model, config, dtau, sweeps=80)
+        bins_up[i] = np.diagonal(gf_up)
+        bins_dn[i] = np.diagonal(gf_dn)
+
+    t = time.time() - t0
+    mins, secs = divmod(t, 60)
+    print(f"Total time: {int(mins):0>2}:{int(secs):0>2} min")
+    print()
+
+    gf_up = np.mean(bins_up, axis=0)
+    gf_dn = np.mean(bins_dn, axis=0)
+    print(gf_up, np.std(bins_up, axis=0))
+    print(gf_dn, np.std(bins_dn, axis=0))
+
+    # save(model, beta, time_steps, gf)
+    return gf_up, gf_dn
+
+
 def filling(g_sigma):
     r""" Computes the local filling of the model.
 
@@ -328,7 +357,7 @@ def main():
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
 
-    gf_up, gf_dn = measure(model, beta, time_steps)
+    gf_up, gf_dn = measure_binned(model, beta, time_steps)
     # gf = np.load("data\\gf_t=2_nt=20_u=2_t=1_mu=1.0.npy")
 
     n_up = filling(gf_up)

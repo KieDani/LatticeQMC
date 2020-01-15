@@ -4,6 +4,10 @@ Created on 13 Jan 2020
 
 project: LatticeQMC
 version: 1.0
+
+To do
+-----
+- So far every update is accepted (ratio too high)
 """
 import time
 import numpy as np
