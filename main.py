@@ -61,6 +61,29 @@ def load_gf_tau(model, beta, time_steps):
     return np.load(file)
 
 
+def filling(g_sigma):
+    r""" Computes the local filling of the model.
+
+    Parameters
+    ----------
+    g_sigma: (N, N) np.ndarray
+        Green's function .math'G_{\sigma}' of a spin channel.
+
+    Returns
+    -------
+    n: (N) np.ndarray
+    """
+    return 1 - np.diagonal(g_sigma)
+
+
+def print_filling(gf_up, gf_dn):
+    n_up = filling(gf_up)
+    n_dn = filling(gf_dn)
+    print(f"<n↑> = {np.mean(n_up):.3f}  {n_up}")
+    print(f"<n↓> = {np.mean(n_dn):.3f}  {n_dn}")
+    print(f"<n>  = {np.mean(n_up + n_dn):.3f}")
+
+
 def measure(model, beta, time_steps, sweeps=1000, warmup_ratio=0.2, fast=True):
     """ Runs the lqmc warmup and measurement loop for the given model.
 
@@ -101,29 +124,6 @@ def measure(model, beta, time_steps, sweeps=1000, warmup_ratio=0.2, fast=True):
     print()
     save_gf_tau(model, beta, time_steps, gf)
     return gf
-
-
-def filling(g_sigma):
-    r""" Computes the local filling of the model.
-
-    Parameters
-    ----------
-    g_sigma: (N, N) np.ndarray
-        Green's function .math'G_{\sigma}' of a spin channel.
-
-    Returns
-    -------
-    n: (N) np.ndarray
-    """
-    return 1 - np.diagonal(g_sigma)
-
-
-def print_filling(gf_up, gf_dn):
-    n_up = filling(gf_up)
-    n_dn = filling(gf_dn)
-    print(f"<n↑> = {np.mean(n_up):.3f}  {n_up}")
-    print(f"<n↓> = {np.mean(n_dn):.3f}  {n_dn}")
-    print(f"<n>  = {np.mean(n_up + n_dn):.3f}")
 
 
 def tau2iw_dft(gf_tau, beta):
