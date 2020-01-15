@@ -268,7 +268,7 @@ def gf_tau(g_beta, ham_kin, dtau, lamb, sigma, config, time_steps):
     exp_k = expm(dtau * ham_kin)
 
     #g[0][:,:] is Greensfunction at time beta, g[1][0:0] is Greensfunction one step before, etc
-    g=np.array[(time_steps,n,n)]
+    g=np.array((time_steps,n,n), dtype=np.float64)
     g[0][:,:]= g_beta
 
     for l in range(1,time_steps):
@@ -363,8 +363,4 @@ def main():
 
 
 if __name__ == "__main__":
-    #main()
-
-    g=np.zeros((3,2,2))
-    g[1] = np.ones((2,2))
-    print(g)
+    main()
