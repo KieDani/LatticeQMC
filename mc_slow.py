@@ -276,8 +276,11 @@ def gf_tau(g_beta, ham_kin, dtau, lamb, sigma, config, time_steps):
     # check if there is a better way to calculate the matrix exponential
     exp_k = expm(dtau * ham_kin)
 
-    #g[0][:,:] is Greensfunction at time beta, g[1][0:0] is Greensfunction one step before, etc
-    g=np.array((time_steps,n,n), dtype=np.float64)
+    # g[0][:,:] is Greensfunction at time beta, g[1][0:0] is Greensfunction one step before, etc
+    g=np.zeros((time_steps,n,n), dtype=np.float64)
+    # print(g[0])
+    # print('')
+    # print(g_beta)
     g[0][:,:]= g_beta
 
     for l in range(1,time_steps):
@@ -286,8 +289,12 @@ def gf_tau(g_beta, ham_kin, dtau, lamb, sigma, config, time_steps):
         np.fill_diagonal(v, config[:, l])
         exp_v = expm(sigma * lamb * v)
         b = np.dot(exp_k, exp_v)
+        # print()
+        # print(b)
+        # print()
+        # print(np.linalg.inv(b))
 
-        g[l][:,:] = np.dot(np.dot(b, g[l-1][:,:]), np.invert(b))
+        g[l][:,:] = np.dot(np.dot(b, g[l-1][:,:]), np.linalg.inv(b))
     return g
 
 
@@ -364,8 +371,8 @@ def main():
     gf_up, gf_dn = measure(model, beta, time_steps)
     # gf = np.load("data\\gf_t=2_nt=20_u=2_t=1_mu=1.0.npy")
 
-    n_up = filling(gf_up)
-    n_dn = filling(gf_dn)
+    n_up = filling(gf_up[0])
+    n_dn = filling(gf_dn[0])
     print(f"<n↑> = {np.mean(n_up):.3f}  {n_up}")
     print(f"<n↓> = {np.mean(n_dn):.3f}  {n_dn}")
     print(f"<n>  = {np.mean(n_up + n_dn):.3f}")
