@@ -63,10 +63,6 @@ def mc_loop(n_sites, n_t):
 
 def warmup(model, config, dtau, lamb, sweeps=200):
     ham_kin = model.ham_kinetic()
-
-    # Store copy of current configuration
-    old_config = config.copy()
-
     # QMC loop
     acc = False
     ratio = 0
@@ -74,8 +70,6 @@ def warmup(model, config, dtau, lamb, sweeps=200):
     for sweep in range(sweeps):
         for i, l in itertools.product(range(model.n_sites), range(config.n_t)):
             updateln(f"Warmup sweep: {sweep+1}/{sweeps}, accepted: {acc} (ratio={ratio:.2f})")
-            # Update Configuration
-            config.update(i, l)
 
             # Calculate m-matrices and ratio of the configurations
             # Accept move with metropolis acceptance ratio.
@@ -83,18 +77,16 @@ def warmup(model, config, dtau, lamb, sweeps=200):
             m_dn = compute_m(ham_kin, config, lamb, dtau, sigma=-1)
             d_up = 1 + (1 - np.linalg.inv(m_up)[i, i]) * (np.exp(-2 * lamb * config[i, l]) - 1)
             d_dn = 1 + (1 - np.linalg.inv(m_dn)[i, i]) * (np.exp(+2 * lamb * config[i, l]) - 1)
-            ratio = d_up + d_dn
+            ratio = d_up * d_dn
             r = np.random.rand()  # Random number between 0 and 1
             if r < ratio:
                 # Move accepted:
-                # Continue using the new configuration
+                # Update configuration
                 acc = True
-                old_config = config.copy()
+                config.update(i, l)
             else:
-                # Move not accepted:
-                # Revert to the old configuration
+                # Move not accepted!
                 acc = False
-                config = old_config
     print()
     return config
 
@@ -112,9 +104,6 @@ def measure_gf(model, config, dtau, lamb, sweeps=800):
     g_tmp_up = np.linalg.inv(m_up)
     g_tmp_dn = np.linalg.inv(m_dn)
 
-    # Store copy of current configuration
-    old_config = config.copy()
-
     # QMC loop
     acc = False
     number = 0
@@ -122,8 +111,6 @@ def measure_gf(model, config, dtau, lamb, sweeps=800):
     for sweep in range(sweeps):
         for i, l in itertools.product(range(model.n_sites), range(config.n_t)):
             updateln(f"Measurement sweep: {sweep+1}/{sweeps}, accepted: {acc}")
-            # Update Configuration
-            config.update(i, l)
 
             # Calculate m-matrices and ratio of the configurations
             # Accept move with metropolis acceptance ratio.
@@ -131,11 +118,11 @@ def measure_gf(model, config, dtau, lamb, sweeps=800):
             m_dn = compute_m(ham_kin, config, lamb, dtau, sigma=-1)
             d_up = 1 + (1 - np.linalg.inv(m_up)[i, i]) * (np.exp(-2 * lamb * config[i, l]) - 1)
             d_dn = 1 + (1 - np.linalg.inv(m_dn)[i, i]) * (np.exp(+2 * lamb * config[i, l]) - 1)
-            ratio = d_up + d_dn
+            ratio = d_up * d_dn
             r = np.random.rand()  # Random number between 0 and 1
             if r < ratio:
                 # Move accepted:
-                # Update temp greens function and continue using the new configuration
+                # Update temp greens function and update configuration
                 c_up = np.zeros(n, dtype=np.float64)
                 c_dn = np.zeros(n, dtype=np.float64)
                 c_up[i] = np.exp(-2 * lamb * config[i, l]) - 1
@@ -150,12 +137,12 @@ def measure_gf(model, config, dtau, lamb, sweeps=800):
                 g_tmp_dn = g_tmp_dn - np.outer(b_dn, c_dn)
 
                 acc = True
-                old_config = config.copy()
+                # Update Configuration
+                config.update(i, l)
             else:
                 # Move not accepted:
                 # Revert to the old configuration
                 acc = False
-                config = old_config
 
             # Add temp greens function to total gf after each step
             gf_up += g_tmp_up

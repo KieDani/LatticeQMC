@@ -1,17 +1,15 @@
 # coding: utf-8
 """
-Created on 13 Jan 2020
+Created on 15 Jan 2020
 
 project: LatticeQMC
 version: 1.0
 
-To do
+To Do
 -----
-- Multiproccesing
-- M-matrix inner func (??)
-- Improve saving and loading
+- Efficiency
+- Green's function time slices
 """
-import time
 import logging
 import itertools
 import numpy as np
@@ -19,7 +17,7 @@ from scipy.linalg import expm
 from lqmc import HubbardModel, Configuration
 
 # Configure basic logging for lqmc-loop
-log_file = 'data\\lqmc_slow.log'
+log_file = 'data\\lqmc.log'
 logging.basicConfig(filename=log_file, filemode="w", format='%(message)s', level=logging.DEBUG)
 
 
@@ -34,48 +32,21 @@ def updateln(string):
     print("\r" + string, end="", flush=True)
 
 
-def check_params(u, t, dtau):
-    r""" Checks the configuration of the model and HS-field.
-
-    .. math::
-        U t \Delta\tau < \frac{1}{10}
+def compute_lambda(u, dtau):
+    r""" Computes the factor '\lambda' used in the computation of 'M'.
 
     Parameters
     ----------
     u: float
         Hubbard interaction :math:`U`.
-    t: float
-        Hopping parameter :math:'t'.
     dtau: float
         Time slice size of the HS-field.
+
+    Returns
+    -------
+    lamb: float
     """
-    check_val = u * t * dtau**2
-    if check_val < 0.1:
-        print(f"Check-value {check_val:.2f} is smaller than 0.1!")
-    else:
-        print(f"Check-value {check_val:.2f} should be smaller than 0.1!")
-
-
-def save_gf_tau(model, beta, time_steps, gf):
-    """ Save time depended Green's function measurement data
-
-    To Do
-    -----
-    Improve saving and loading
-    """
-    file = f"data\\gf2_t={beta}_nt={time_steps}_{model.param_str()}.npy"
-    np.save(file, gf)
-
-
-def load_gf_tau(model, beta, time_steps):
-    """ Load saved time depended Green's function measurement data
-
-    To Do
-    -----
-    Improve saving and loading
-    """
-    file = f"data\\gf2_t={beta}_nt={time_steps}_{model.param_str()}.npy"
-    return np.load(file)
+    return np.arccosh(np.exp(u * dtau / 2.))
 
 
 def compute_m(ham_kin, config, lamb, dtau, sigma):
@@ -167,21 +138,22 @@ def compute_gf_tau(config, ham_kin, g_beta, lamb, dtau, sigma):
     # check if there is a better way to calculate the matrix exponential
     exp_k = expm(dtau * ham_kin)
 
+    v = np.zeros((n, n), dtype=config.dtype)
+
     # g[0, :, :] is Greensfunction at time beta, g[1, :, :] is Greensfunction one step before, etc
     g = np.zeros((config.n_t, n, n), dtype=np.float64)
     g[0, :, :] = g_beta
     for l in range(1, config.n_t):
         # Create the V_l matrix
-        v = np.zeros((n, n), dtype=config.dtype)
         np.fill_diagonal(v, config[:, l])
-
         exp_v = expm(sigma * lamb * v)
+
         b = np.dot(exp_k, exp_v)
         g[l, :, :] = np.dot(np.dot(b, g[l-1, :, :]), np.linalg.inv(b))
     return g
 
 
-def warmup(model, config, dtau, sweeps=200):
+def warmup_loop(model, config, dtau, sweeps=200, fast=True):
     """ Runs the warmup lqmc-loop
 
     Parameters
@@ -189,12 +161,14 @@ def warmup(model, config, dtau, sweeps=200):
     model: HubbardModel
         The Hubbard model instance.
     config: Configuration
-        The current HS-field configuration object.
+        The current HS-field configuration object after warmup.
         This contains the field .math'h_{il}'
     dtau: float
         Time slice size of the HS-field.
     sweeps: int, optional
         Number of sweeps through the HS-field.
+    fast: bool, optional
+        Flag if the fast algorithm should be used. The default is True.
 
     Returns
     -------
@@ -204,7 +178,7 @@ def warmup(model, config, dtau, sweeps=200):
     ham_kin = model.ham_kinetic()
 
     # Calculate factor
-    lamb = np.arccosh(np.exp(model.u * dtau / 2.))
+    lamb = compute_lambda(model.u, dtau)
 
     # Calculate m-matrices
     m_up = compute_m(ham_kin, config, lamb, dtau, sigma=+1)
@@ -213,40 +187,58 @@ def warmup(model, config, dtau, sweeps=200):
 
     # Store copy of current configuration
     old_config = config.copy()
-    acc = False
     # QMC loop
+    acc = False
+    ratio = 0
     updateln("Warmup sweep")
     for sweep in range(sweeps):
         for i, l in itertools.product(range(model.n_sites), range(config.n_t)):
-            updateln(f"Warmup sweep: {sweep+1}/{sweeps}, accepted: {acc}")
-            # Update Configuration
-            config.update(i, l)
-
-            # Calculate m-matrices and ratio of the configurations
-            # Accept move with metropolis acceptance ratio.
-            m_up = compute_m(ham_kin, config, lamb, dtau, sigma=+1)
-            m_dn = compute_m(ham_kin, config, lamb, dtau, sigma=-1)
-            new = np.linalg.det(m_up) * np.linalg.det(m_dn)
-            ratio = new / old
-            r = np.random.rand()  # Random number between 0 and 1
-            if r < ratio:
-                # Move accepted:
-                # Continue using the new configuration
-                acc = True
-                old = new
-                old_config = config.copy()
+            updateln(f"Warmup sweep: {sweep+1}/{sweeps}, accepted: {acc} (ratio={ratio:.2f})")
+            if fast:
+                # Calculate m-matrices and ratio of the configurations
+                # Accept move with metropolis acceptance ratio.
+                m_up = compute_m(ham_kin, config, lamb, dtau, sigma=+1)
+                m_dn = compute_m(ham_kin, config, lamb, dtau, sigma=-1)
+                d_up = 1 + (1 - np.linalg.inv(m_up)[i, i]) * (np.exp(-2 * lamb * config[i, l]) - 1)
+                d_dn = 1 + (1 - np.linalg.inv(m_dn)[i, i]) * (np.exp(+2 * lamb * config[i, l]) - 1)
+                ratio = d_up * d_dn
+                r = np.random.rand()  # Random number between 0 and 1
+                if r < ratio:
+                    # Move accepted:
+                    # Update configuration
+                    acc = True
+                    config.update(i, l)
+                else:
+                    # Move not accepted!
+                    acc = False
             else:
-                # Move not accepted:
-                # Revert to the old configuration
-                acc = False
-                config = old_config
+                # Update Configuration
+                config.update(i, l)
+                # Calculate m-matrices and ratio of the configurations
+                # Accept move with metropolis acceptance ratio.
+                m_up = compute_m(ham_kin, config, lamb, dtau, sigma=+1)
+                m_dn = compute_m(ham_kin, config, lamb, dtau, sigma=-1)
+                new = np.linalg.det(m_up) * np.linalg.det(m_dn)
+                ratio = new / old
+                r = np.random.rand()  # Random number between 0 and 1
+                if r < ratio:
+                    # Move accepted:
+                    # Continue using the new configuration
+                    acc = True
+                    old = new
+                    old_config = config.copy()
+                else:
+                    # Move not accepted:
+                    # Revert to the old configuration
+                    acc = False
+                    config = old_config
 
             logging.info(f"[Warmup] Sweep={sweep} i={i}, l={l} - ratio={ratio:.3f}, accepted={acc}")
     print()
     return config
 
 
-def measure_gf(model, config, dtau, sweeps=800):
+def measure_loop(model, config, dtau, sweeps=800, fast=True):
     r""" Runs the measurement lqmc-loop and returns the measured Green's function
 
     Parameters
@@ -260,6 +252,8 @@ def measure_gf(model, config, dtau, sweeps=800):
         Time slice size of the HS-field.
     sweeps: int, optional
         Number of sweeps through the HS-field.
+    fast: bool, optional
+        Flag if the fast algorithm should be used. The default is True.
 
     Returns
     -------
@@ -269,9 +263,10 @@ def measure_gf(model, config, dtau, sweeps=800):
         Measured spin-down Green's function .math'G_\downarrow(\tau)' for all time slices.
     """
     ham_kin = model.ham_kinetic()
+    n = model.n_sites
 
     # Calculate factor
-    lamb = np.arccosh(np.exp(model.u * dtau / 2.))
+    lamb = compute_lambda(model.u, dtau)
 
     # Calculate m-matrices
     m_up = compute_m(ham_kin, config, lamb, dtau, sigma=+1)
@@ -292,36 +287,73 @@ def measure_gf(model, config, dtau, sweeps=800):
 
     # QMC loop
     acc = False
+    ratio = 0
     number = 0
     updateln("Measurement sweep")
     for sweep in range(sweeps):
         for i, l in itertools.product(range(model.n_sites), range(config.n_t)):
-            updateln(f"Measurement sweep: {sweep+1}/{sweeps}, accepted: {acc}")
-            # Update Configuration
-            config.update(i, l)
-            # Calculate m-matrices and ratio of the configurations
-            # Accept move with metropolis acceptance ratio.
-            m_up = compute_m(ham_kin, config, lamb, dtau, sigma=+1)
-            m_dn = compute_m(ham_kin, config, lamb, dtau, sigma=-1)
-            new = np.linalg.det(m_up) * np.linalg.det(m_dn)
-            ratio = new / old
-            r = np.random.rand()  # Random number between 0 and 1
-            if r < ratio:
-                # Move accepted:
-                # Update temp greens function and continue using the new configuration
-                g_beta_up = np.linalg.inv(m_up)
-                g_beta_dn = np.linalg.inv(m_dn)
-                g_tmp_up = compute_gf_tau(config, ham_kin, g_beta_up, dtau, lamb, sigma=+1)
-                g_tmp_dn = compute_gf_tau(config, ham_kin, g_beta_dn, dtau, lamb, sigma=-1)
+            updateln(f"Measurement sweep: {sweep+1}/{sweeps}, accepted: {acc} (ratio={ratio:.2f})")
 
-                acc = True
-                old = new
-                old_config = config.copy()
+            if fast:
+                # Calculate m-matrices and ratio of the configurations
+                # Accept move with metropolis acceptance ratio.
+                m_up = compute_m(ham_kin, config, lamb, dtau, sigma=+1)
+                m_dn = compute_m(ham_kin, config, lamb, dtau, sigma=-1)
+                d_up = 1 + (1 - np.linalg.inv(m_up)[i, i]) * (np.exp(-2 * lamb * config[i, l]) - 1)
+                d_dn = 1 + (1 - np.linalg.inv(m_dn)[i, i]) * (np.exp(+2 * lamb * config[i, l]) - 1)
+                ratio = d_up * d_dn
+                r = np.random.rand()  # Random number between 0 and 1
+                if r < ratio:
+                    # Move accepted:
+                    # Update temp greens function and update configuration
+                    c_up = np.zeros(n, dtype=np.float64)
+                    c_dn = np.zeros(n, dtype=np.float64)
+                    c_up[i] = np.exp(-2 * lamb * config[i, l]) - 1
+                    c_dn[i] = np.exp(+2 * lamb * config[i, l]) - 1
+                    c_up = -1 * (np.exp(-2 * lamb * config[i, l]) - 1) * g_beta_up[i, :] + c_up
+                    c_dn = -1 * (np.exp(+2 * lamb * config[i, l]) - 1) * g_beta_dn[i, :] + c_dn
+
+                    b_up = g_beta_up[:, i] / (1. + c_up[i])
+                    b_dn = g_beta_dn[:, i] / (1. + c_dn[i])
+
+                    g_beta_up = g_beta_up - np.outer(b_up, c_up)
+                    g_beta_dn = g_beta_dn - np.outer(b_dn, c_dn)
+                    g_tmp_up = compute_gf_tau(config, ham_kin, g_beta_up, lamb, dtau, sigma=+1)
+                    g_tmp_dn = compute_gf_tau(config, ham_kin, g_beta_dn, lamb, dtau, sigma=-1)
+
+                    acc = True
+                    # Update Configuration
+                    config.update(i, l)
+                else:
+                    # Move not accepted:
+                    # Revert to the old configuration
+                    acc = False
             else:
-                # Move not accepted:
-                # Revert to the old configuration
-                acc = False
-                config = old_config
+                # Update Configuration
+                config.update(i, l)
+                # Calculate m-matrices and ratio of the configurations
+                # Accept move with metropolis acceptance ratio.
+                m_up = compute_m(ham_kin, config, lamb, dtau, sigma=+1)
+                m_dn = compute_m(ham_kin, config, lamb, dtau, sigma=-1)
+                new = np.linalg.det(m_up) * np.linalg.det(m_dn)
+                ratio = new / old
+                r = np.random.rand()  # Random number between 0 and 1
+                if r < ratio:
+                    # Move accepted:
+                    # Update temp greens function and continue using the new configuration
+                    g_beta_up = np.linalg.inv(m_up)
+                    g_beta_dn = np.linalg.inv(m_dn)
+                    g_tmp_up = compute_gf_tau(config, ham_kin, g_beta_up, dtau, lamb, sigma=+1)
+                    g_tmp_dn = compute_gf_tau(config, ham_kin, g_beta_dn, dtau, lamb, sigma=-1)
+
+                    acc = True
+                    old = new
+                    old_config = config.copy()
+                else:
+                    # Move not accepted:
+                    # Revert to the old configuration
+                    acc = False
+                    config = old_config
 
             # Add temp greens function to total gf after each step
             gf_up += g_tmp_up
@@ -332,89 +364,3 @@ def measure_gf(model, config, dtau, sweeps=800):
     print()
     # Return the normalized gfs for each spin
     return np.array([gf_up, gf_dn]) / number
-
-
-def measure(model, beta, time_steps, sweeps=1000, warmup_ratio=0.2):
-    """ Runs the lqmc warmup and measurement loop for the given model.
-
-    Parameters
-    ----------
-    model: HubbardModel
-        The Hubbard model instance.
-    beta: float
-        The inverse temperature .math'\beta = 1/T'.
-    time_steps: int
-        Number of time steps from .math'0' to .math'\beta'
-    sweeps: int, optional
-        Total number of sweeps (warmup + measurement)
-    warmup_ratio: float, optional
-        The ratio of sweeps used for warmup. The default is '0.2'.
-
-    Returns
-    -------
-    gf: (2, N) np.ndarray
-        Measured Green's function .math'G' of the up- and down-spin channel.
-    """
-    dtau = beta / time_steps
-    check_params(model.u, model.t, dtau)
-
-    warmup_sweeps = int(sweeps * warmup_ratio)
-
-    t0 = time.time()
-    config = Configuration(model.n_sites, time_steps)
-    config = warmup(model, config, dtau, sweeps=warmup_sweeps)
-    gf = measure_gf(model, config, dtau, sweeps=sweeps - warmup_sweeps)
-    t = time.time() - t0
-
-    mins, secs = divmod(t, 60)
-    print(f"Total time: {int(mins):0>2}:{int(secs):0>2} min")
-    print()
-    save_gf_tau(model, beta, time_steps, gf)
-    return gf
-
-
-def filling(g_sigma):
-    r""" Computes the local filling of the model.
-
-    Parameters
-    ----------
-    g_sigma: (N, N) np.ndarray
-        Green's function .math'G_{\sigma}' of a spin channel.
-
-    Returns
-    -------
-    n: (N) np.ndarray
-    """
-    return 1 - np.diagonal(g_sigma)
-
-
-def print_filling(gf_up, gf_dn):
-    n_up = filling(gf_up)
-    n_dn = filling(gf_dn)
-    print(f"<n↑> = {np.mean(n_up):.3f}  {n_up}")
-    print(f"<n↓> = {np.mean(n_dn):.3f}  {n_dn}")
-    print(f"<n>  = {np.mean(n_up + n_dn):.3f}")
-
-
-def main():
-    n_sites = 4
-    u, t = 2, 1
-    temp = 2
-    beta = 1 / temp
-    time_steps = 50
-
-    model = HubbardModel(u=u, t=t, mu=u / 2)
-    model.build(n_sites)
-
-    gf_tau_up, gf_tau_dn = measure(model, beta, time_steps, sweeps=500)
-    # gf_tau_up, gf_tau_dn = load_gf_tau(model, beta, time_steps)
-
-    n_up = filling(gf_tau_up[0])
-    n_dn = filling(gf_tau_dn[0])
-    print(f"<n↑> = {np.mean(n_up):.3f}  {n_up}")
-    print(f"<n↓> = {np.mean(n_dn):.3f}  {n_dn}")
-    print(f"<n>  = {np.mean(n_up + n_dn):.3f}")
-
-
-if __name__ == "__main__":
-    main()
