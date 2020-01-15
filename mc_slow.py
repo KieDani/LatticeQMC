@@ -213,6 +213,7 @@ def measure_gf(model, config, dtau, time_steps, sweeps=800):
     gf_up, gf_dn = 0, 0
     g_tmp_up_beta = np.linalg.inv(m_up)
     g_tmp_dn_beta = np.linalg.inv(m_dn)
+    #the Greensfunction for all steps is calculated out of the Greensfunction at time beta
     g_tmp_up = gf_tau(g_beta=g_tmp_up_beta, ham_kin=ham_kin, dtau=dtau, lamb=lamb, sigma=+1, config=config,
                       time_steps=time_steps)
     g_tmp_dn = gf_tau(g_beta=g_tmp_dn_beta, ham_kin=ham_kin, dtau=dtau, lamb=lamb, sigma=-1, config=config,
@@ -325,7 +326,7 @@ def measure(model, beta, time_steps):
     t0 = time.time()
     config = Configuration(model.n_sites, time_steps)
     config = warmup(model, config, dtau, sweeps=20)
-    gf = measure_gf(model, config, dtau, sweeps=80)
+    gf = measure_gf(model, config, dtau, time_steps=time_steps, sweeps=80)
     t = time.time() - t0
 
     mins, secs = divmod(t, 60)
