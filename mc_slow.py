@@ -259,6 +259,30 @@ def measure_gf(model, config, dtau, sweeps=800):
     return np.array([gf_up, gf_dn]) / number
 
 
+
+def gf_tau(g_beta, ham_kin, dtau, lamb, sigma, config, time_steps):
+    n = ham_kin.shape[0]
+
+    # Calculate the first matrix exp of B. This is a static value.
+    # check if there is a better way to calculate the matrix exponential
+    exp_k = expm(dtau * ham_kin)
+
+    #g[0][:,:] is Greensfunction at time beta, g[1][0:0] is Greensfunction one step before, etc
+    g=np.array[(time_steps,n,n)]
+    g[0][:,:]= g_beta
+
+    for l in range(1,time_steps):
+        # Create the V_l matrix
+        v = np.zeros((n, n), dtype=config.dtype)
+        np.fill_diagonal(v, config[:, l])
+        exp_v = expm(sigma * lamb * v)
+        b = np.dot(exp_k, exp_v)
+
+        g[l][:,:] = np.dot(np.dot(b, g[l-1][:,:]), np.invert(b))
+    return g
+
+
+
 def save(model, beta, time_steps, gf):
     """ Save data to file
 
@@ -339,4 +363,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    #main()
+
+    g=np.zeros((3,2,2))
+    g[1] = np.ones((2,2))
+    print(g)
