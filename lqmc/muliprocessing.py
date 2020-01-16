@@ -46,7 +46,7 @@ class LqmcProcessManager:
     CORE_COUNT = multiprocessing.cpu_count()
 
     def __init__(self, cores=None):
-        self.cores = multiprocessing.cpu_count() - 1 if cores is None else cores
+        self.cores = multiprocessing.cpu_count() if cores is None else cores
         self.iters = multiprocessing.Array("i", self.cores)
         self.processes = list()
         self.pipes = list()

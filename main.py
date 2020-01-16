@@ -87,7 +87,7 @@ def measure_single_process(model, beta, time_steps, sweeps, warmup_ratio=0.2):
 
 
 def measure_multi_process(model, beta, time_steps, sweeps, warmup_ratio=0.2):
-    manager = LqmcProcessManager(2)
+    manager = LqmcProcessManager()
     manager.init(model, beta, time_steps, sweeps, warmup_ratio)
 
     manager.start()
@@ -137,8 +137,8 @@ def main():
     temp = 2
     beta = 1 / temp
     # Simulation parameters
-    sweeps = 200
-    time_steps = 10
+    sweeps = 1000
+    time_steps = 35
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
