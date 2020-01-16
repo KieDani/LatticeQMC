@@ -11,19 +11,19 @@ import numpy as np
 class Configuration:
     """ Configuration class representing the hubbard-Stratonovich (HS) field."""
 
-    def __init__(self, n, n_t):
+    def __init__(self, n, time_steps):
         """ Constructor of the Configuration class
 
         Parameters
         ----------
         n: int
             Number of spatial lattice sites.
-        n_t: int
+        time_steps: int
             Number of time slices (per site).
         """
         self.n = n
-        self.n_t = n_t
-        self.config = np.zeros((n, n_t), dtype=np.int8)
+        self.time_steps = time_steps
+        self.config = np.zeros((n, time_steps), dtype=np.int8)
         self.initialize()
 
     @property
@@ -37,14 +37,14 @@ class Configuration:
         -------
         config: Configuration
         """
-        config = Configuration(self.n, self.n_t)
+        config = Configuration(self.n, self.time_steps)
         config.config = np.copy(self.config)
         return config
 
     def initialize(self):
         """ Initializes the configuration with a random distribution of -1 and +1 """
         # Create an array of random 0 and 1.
-        config = np.random.randint(0, 2, size=(self.n, self.n_t))
+        config = np.random.randint(0, 2, size=(self.n, self.time_steps))
         # Scale array to -1 and 1
         self.config = 2*config - 1
 
