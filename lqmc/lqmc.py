@@ -29,51 +29,6 @@ def updateln(string):
     print("\r" + string, end="", flush=True)
 
 
-def check_params(u, t, dtau):
-    r""" Checks the configuration of the model and HS-field.
-
-    .. math::
-        U t \Delta\tau < \frac{1}{10}
-
-    Parameters
-    ----------
-    u: float
-        Hubbard interaction :math:`U`.
-    t: float
-        Hopping parameter :math:'t'.
-    dtau: float
-        Time slice size of the HS-field.
-    """
-    check_val = u * t * dtau**2
-    if check_val < 0.1:
-        print(f"Check-value {check_val:.2f} is smaller than 0.1!")
-    else:
-        print(f"Check-value {check_val:.2f} should be smaller than 0.1!")
-
-
-def filling(g_sigma):
-    r""" Computes the local filling of the model.
-
-    Parameters
-    ----------
-    g_sigma: (N, N) np.ndarray
-        Green's function .math'G_{\sigma}' of a spin channel.
-
-    Returns
-    -------
-    n: (N) np.ndarray
-    """
-    return 1 - np.diagonal(g_sigma)
-
-
-def print_filling(gf_up, gf_dn):
-    n_up = filling(gf_up)
-    n_dn = filling(gf_dn)
-    print(f"<n↑> = {np.mean(n_up):.3f}  {n_up}")
-    print(f"<n↓> = {np.mean(n_dn):.3f}  {n_dn}")
-    print(f"<n>  = {np.mean(n_up + n_dn):.3f}")
-
-
 def compute_lambda(u, dtau):
     r""" Computes the factor '\lambda' used in the computation of 'M'.
 
@@ -233,7 +188,7 @@ def warmup_loop(model, config, dtau, sweeps=200, fast=True):
     # updateln("Warmup sweep")
     for sweep in range(sweeps):
         for i, l in itertools.product(range(model.n_sites), range(config.time_steps)):
-            # updateln(f"Warmup sweep: {sweep+1}/{sweeps}, accepted: {acc} (ratio={ratio:.2f})")
+            updateln(f"Warmup sweep: {sweep+1}/{sweeps}, accepted: {acc} (ratio={ratio:.2f})")
             if fast:
                 # Calculate m-matrices and ratio of the configurations
                 # Accept move with metropolis acceptance ratio.
@@ -320,10 +275,10 @@ def measure_loop(model, config, dtau, sweeps=800, fast=True):
     acc = False
     ratio = 0
     number = 0
-    # updateln("Measurement sweep")
+    updateln("Measurement sweep")
     for sweep in range(sweeps):
         for i, l in itertools.product(range(model.n_sites), range(config.time_steps)):
-            # updateln(f"Measurement sweep: {sweep+1}/{sweeps}, accepted: {acc} (ratio={ratio:.2f})")
+            updateln(f"Measurement sweep: {sweep+1}/{sweeps}, accepted: {acc} (ratio={ratio:.2f})")
 
             if fast:
                 # Calculate m-matrices and ratio of the configurations

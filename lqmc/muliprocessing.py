@@ -65,10 +65,10 @@ class LqmcProcessManager:
     def all_done(self):
         return all(self.processes_done())
 
-    def init(self, model, beta, time_steps, sweeps, warmup_ratio=0.2):
+    def init(self, model, beta, time_steps, sweeps_per_core, warmup_ratio=0.2):
         self.processes = list()
         self.pipes = list()
-
+        sweeps = sweeps_per_core * self.cores
         core_sweeps = np.full(self.cores, sweeps / self.cores, dtype="int")
         core_sweeps[0] += sweeps - np.sum(core_sweeps)
         self.sweeps = core_sweeps

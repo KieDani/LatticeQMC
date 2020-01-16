@@ -14,8 +14,9 @@ To do
 import time
 import logging
 import numpy as np
-from lqmc import HubbardModel, Configuration
-from lqmc.lqmc import warmup_loop, measure_loop, check_params, print_filling, LatticeQMC
+from lqmc import HubbardModel, check_params, print_filling
+from lqmc.lqmc import LatticeQMC
+from lqmc.muliprocessing import LqmcProcessManager
 
 # Configure basic logging for lqmc-loop
 # logging.basicConfig(filename="lqmc.log", filemode="w", format='%(message)s', level=logging.DEBUG)
@@ -68,7 +69,38 @@ def tau2iw_dft(gf_tau, beta):
     return gf_iw
 
 
-def measure(model, beta, time_steps, sweeps=1000, warmup_ratio=0.2, fast=True):
+def measure_single_process(model, beta, time_steps, sweeps, warmup_ratio=0.2):
+    t0 = time.time()
+
+    solver = LatticeQMC(model, beta, time_steps, sweeps, warmup_ratio)
+    print("Warmup:     ", solver.warm_sweeps)
+    print("Measurement:", solver.meas_sweeps)
+    check_params(model.u, model.t, solver.dtau)
+    solver.warmup_loop()
+    gf_tau = solver.measure_loop()
+
+    t = time.time() - t0
+    mins, secs = divmod(t, 60)
+    print(f"\nTotal time: {int(mins):0>2}:{int(secs):0>2} min")
+    print()
+    return gf_tau
+
+
+def measure_multi_process(model, beta, time_steps, sweeps, warmup_ratio=0.2):
+    manager = LqmcProcessManager(2)
+    manager.init(model, beta, time_steps, sweeps, warmup_ratio)
+
+    manager.start()
+    manager.run()
+    manager.join()
+    gf_data = manager.recv_all()
+    manager.terminate()
+
+    gf_tau = np.sum(gf_data, axis=0) / manager.cores
+    return gf_tau
+
+
+def measure(model, beta, time_steps, sweeps, warmup_ratio=0.2, mp=True):
     """ Runs the lqmc warmup and measurement loop for the given model.
 
     Parameters
@@ -83,31 +115,19 @@ def measure(model, beta, time_steps, sweeps=1000, warmup_ratio=0.2, fast=True):
         Total number of sweeps (warmup + measurement)
     warmup_ratio: float, optional
         The ratio of sweeps used for warmup. The default is '0.2'.
-    fast: bool, optional
-        Flag if the fast algorithm should be used. The default is True.
+    mp: bool, optional
+        Flag if multiprocessing should be used. The default is True.
 
     Returns
     -------
     gf: (2, N) np.ndarray
         Measured Green's function .math'G' of the up- and down-spin channel.
     """
-    dtau = beta / time_steps
-    check_params(model.u, model.t, dtau)
-
-    warmup_sweeps = int(sweeps * warmup_ratio)
-    measure_sweeps = sweeps - warmup_sweeps
-
-    t0 = time.time()
-    config = Configuration(model.n_sites, time_steps)
-    config = warmup_loop(model, config, dtau, warmup_sweeps, fast=fast)
-    gf = measure_loop(model, config, dtau, measure_sweeps, fast=fast)
-    t = time.time() - t0
-
-    mins, secs = divmod(t, 60)
-    print(f"Total time: {int(mins):0>2}:{int(secs):0>2} min")
-    print()
-    save_gf_tau(model, beta, time_steps, gf)
-    return gf
+    if mp:
+        gf_tau = measure_multi_process(model, beta, time_steps, sweeps, warmup_ratio)
+    else:
+        gf_tau = measure_single_process(model, beta, time_steps, sweeps, warmup_ratio)
+    return gf_tau
 
 
 def main():
@@ -116,21 +136,18 @@ def main():
     u, t = 2, 1
     temp = 2
     beta = 1 / temp
-
     # Simulation parameters
-    sweeps = 100
+    sweeps = 200
     time_steps = 10
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
 
-    solver = LatticeQMC(model, beta, time_steps, sweeps)
-    solver.warmup_loop()
-    gf_tau_up, gf_tau_dn = solver.measure_loop()
+    gf_tau = measure(model, beta, time_steps, sweeps, mp=True)
+    save_gf_tau(model, beta, time_steps, gf_tau)
+    # gf_tau = load_gf_tau(model, beta, time_steps)
 
-    # gf_tau_up, gf_tau_dn = measure(model, beta, time_steps, sweeps, fast=True)
-    # gf_tau_up, gf_tau_dn = load_gf_tau(model, beta, time_steps)
-
+    gf_tau_up, gf_tau_dn = gf_tau
     print_filling(gf_tau_up[0], gf_tau_dn[0])
     print()
 
