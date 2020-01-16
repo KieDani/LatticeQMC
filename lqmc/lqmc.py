@@ -132,7 +132,7 @@ def compute_m(ham_kin, config, lamb, dtau, sigma):
     v = np.zeros((n, n), dtype=config.dtype)
 
     # fill diag(V_l) with values of last time slice and compute B-product
-    lmax = config.n_t - 1
+    lmax = config.time_steps - 1
 
     np.fill_diagonal(v, config[:, lmax])
     exp_v = expm(sigma * lamb * v)
@@ -183,9 +183,9 @@ def compute_gf_tau(config, ham_kin, g_beta, lamb, dtau, sigma):
     v = np.zeros((n, n), dtype=config.dtype)
 
     # g[0, :, :] is Greensfunction at time beta, g[1, :, :] is Greensfunction one step before, etc
-    g = np.zeros((config.n_t, n, n), dtype=np.float64)
+    g = np.zeros((config.time_steps, n, n), dtype=np.float64)
     g[0, :, :] = g_beta
-    for l in range(1, config.n_t):
+    for l in range(1, config.time_steps):
         # Create the V_l matrix
         np.fill_diagonal(v, config[:, l])
         exp_v = expm(sigma * lamb * v)
@@ -232,7 +232,7 @@ def warmup_loop(model, config, dtau, sweeps=200, fast=True):
     ratio = 0
     # updateln("Warmup sweep")
     for sweep in range(sweeps):
-        for i, l in itertools.product(range(model.n_sites), range(config.n_t)):
+        for i, l in itertools.product(range(model.n_sites), range(config.time_steps)):
             # updateln(f"Warmup sweep: {sweep+1}/{sweeps}, accepted: {acc} (ratio={ratio:.2f})")
             if fast:
                 # Calculate m-matrices and ratio of the configurations
@@ -322,7 +322,7 @@ def measure_loop(model, config, dtau, sweeps=800, fast=True):
     number = 0
     # updateln("Measurement sweep")
     for sweep in range(sweeps):
-        for i, l in itertools.product(range(model.n_sites), range(config.n_t)):
+        for i, l in itertools.product(range(model.n_sites), range(config.time_steps)):
             # updateln(f"Measurement sweep: {sweep+1}/{sweeps}, accepted: {acc} (ratio={ratio:.2f})")
 
             if fast:
@@ -446,7 +446,7 @@ class LatticeQMC:
         """
         for sweep in range(sweeps):
             self.it = sweep
-            for i, l in itertools.product(range(self.model.n_sites), range(self.config.n_t)):
+            for i, l in itertools.product(range(self.model.n_sites), range(self.config.time_steps)):
                 print(f"\r{self.status} Sweep {sweep} [{i}, {l}]", end="", flush=True)
                 yield sweep, i, l
 
