@@ -396,9 +396,23 @@ def measure_loop(model, config, dtau, sweeps=800, fast=True):
 
 
 class LatticeQMC:
-    """ Fast implementation"""
 
     def __init__(self, model, beta, time_steps, sweeps=1000, warmup_ratio=0.2):
+        """ Initialize the Lattice Quantum Monte-Carlo solver.
+
+        Parameters
+        ----------
+        model: HubbardModel
+            The Hubbard model instance.
+        beta: float
+            The inverse temperature .math'\beta = 1/T'.
+        time_steps: int
+            Number of time steps from .math'0' to .math'\beta'
+        sweeps: int, optional
+            Total number of sweeps (warmup + measurement)
+        warmup_ratio: float, optional
+            The ratio of sweeps used for warmup. The default is '0.2'.
+        """
         self.model = model
         self.dtau = beta / time_steps
         self.warm_sweeps = int(sweeps * warmup_ratio)
@@ -411,7 +425,25 @@ class LatticeQMC:
         self.status = ""
         self.it = 0
 
+    def log_iterstep(self, sweep, i, l, ratio, acc):
+        logging.debug(f"{self.status} {sweep} i={i}, l={l} - ratio={ratio:.3f}, accepted={acc}")
+
     def loop_generator(self, sweeps):
+        """ Generates the indices of the LQMC loop.
+
+        This is mainly used to saving total iteration number and
+        for hooking logging and printing events into the loops easily.
+
+        Parameters
+        ----------
+        sweeps: int
+            Number of sweeps of current loop.
+
+        Yields
+        -------
+        indices: tuple of int
+            Indices of current iteration step consisting of .term'sweep', .term'i' and .term'l'.
+        """
         for sweep in range(sweeps):
             self.it = sweep
             for i, l in itertools.product(range(self.model.n_sites), range(self.config.n_t)):
@@ -419,33 +451,134 @@ class LatticeQMC:
                 yield sweep, i, l
 
     def _compute_m(self):
+        """ Computes the 'M' matrices for both spins.
+
+        Returns
+        -------
+        m_up: (N, N) np.ndarray
+        m_dn: (N, N) np.ndarray
+        """
         m_up = compute_m(self.ham_kin, self.config, self.lamb, self.dtau, sigma=+1)
         m_dn = compute_m(self.ham_kin, self.config, self.lamb, self.dtau, sigma=-1)
         return m_up, m_dn
 
-    def _ratio(self, i, l, m_up, m_dn):
-        d_up = 1 + (1 - np.linalg.inv(m_up)[i, i]) * (np.exp(-2 * self.lamb * self.config[i, l]) - 1)
-        d_dn = 1 + (1 - np.linalg.inv(m_dn)[i, i]) * (np.exp(+2 * self.lamb * self.config[i, l]) - 1)
-        return d_up * d_dn
-
     def _compute_gf_tau(self, g_beta_up, g_beta_dn):
+        """ Computes the time dependend Green's function for both spins
+
+        Returns
+        -------
+        gf_up: (M, N, N) np.ndarray
+            The spin-up Green's function for N sites and M time slices.
+        gf_dn: (M, N, N) np.ndarray
+            The spin-down Green's function for N sites and M time slices.
+        """
         g_tau_up = compute_gf_tau(self.config, self.ham_kin, g_beta_up, self.lamb, self.dtau, sigma=+1)
         g_tau_dn = compute_gf_tau(self.config, self.ham_kin, g_beta_dn, self.lamb, self.dtau, sigma=-1)
         return g_tau_up, g_tau_dn
 
-    def log_iterstep(self, sweep, i, l, ratio, acc):
-        logging.debug(f"{self.status} {sweep} i={i}, l={l} - ratio={ratio:.3f}, accepted={acc}")
+    # def _ratio(self, i, l, m_up, m_dn):
+    #     """ Not used """
+    #     d_up = 1 + (1 - np.linalg.inv(m_up)[i, i]) * (np.exp(-2 * self.lamb * self.config[i, l]) - 1)
+    #     d_dn = 1 + (1 - np.linalg.inv(m_dn)[i, i]) * (np.exp(+2 * self.lamb * self.config[i, l]) - 1)
+    #     return d_up * d_dn
+
+    def warmup_loop_det(self):
+        """ Runs the slow version of the LQMC warmup-loop """
+        self.status = "Warmup"
+        m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
+        old = np.linalg.det(m_up) * np.linalg.det(m_dn)
+        old_config = self.config.copy()  # Store copy of current configuration
+        # QMC loop
+        for sweep, i, l in self.loop_generator(self.warm_sweeps):
+            # Update Configuration
+            self.config.update(i, l)
+
+            m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
+            new = np.linalg.det(m_up) * np.linalg.det(m_dn)
+            ratio = new / old
+            acc = np.random.rand() < ratio
+            if acc:
+                # Move accepted: Continue using the new configuration
+                old = new
+                old_config = self.config.copy()
+            else:
+                # Move not accepted: Revert to the old configuration
+                self.config = old_config
+
+    def measure_loop_det(self):
+        r""" Runs the slow version of the LQMC measurement-loop and returns the Green's function.
+
+        Returns
+        -------
+        gf_dn: (M, N, N) np.ndarray
+            Measured spin-up Green's function .math'G_\uparrow(\tau)' for all M time slices.
+        gf_dn: (M, N, N) np.ndarray
+            Measured spin-down Green's function .math'G_\downarrow(\tau)' for all M time slices.
+        """
+        self.status = "Measurement"
+
+        m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
+        old = np.linalg.det(m_up) * np.linalg.det(m_dn)
+        old_config = self.config.copy()  # Store copy of current configuration
+
+        # Initialize total and temp greens functions
+        gf_up, gf_dn = 0, 0
+        g_beta_up = np.linalg.inv(m_up)
+        g_beta_dn = np.linalg.inv(m_dn)
+        g_tmp_up, g_tmp_dn = self._compute_gf_tau(g_beta_up, g_beta_dn)
+
+        # QMC loop
+        number = 0
+        for sweep, i, l in self.loop_generator(self.meas_sweeps):
+            # Update Configuration
+            self.config.update(i, l)
+
+            m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
+            new = np.linalg.det(m_up) * np.linalg.det(m_dn)
+            ratio = new / old
+            acc = np.random.rand() < ratio
+            if acc:
+                # Move accepted:
+                # Update temp greens function and continue using the new configuration
+                g_beta_up = np.linalg.inv(m_up)
+                g_beta_dn = np.linalg.inv(m_dn)
+                g_tmp_up, g_tmp_dn = self._compute_gf_tau(g_beta_up, g_beta_dn)
+                old = new
+                old_config = self.config.copy()
+            else:
+                # Move not accepted
+                self.config = old_config
+
+            # Add temp greens function to total gf after each step
+            gf_up += g_tmp_up
+            gf_dn += g_tmp_dn
+            number += 1
+        # Return the normalized gfs for each spin
+        return np.array([gf_up, gf_dn]) / number
 
     def warmup_loop(self):
+        """ Runs the fast version of the LQMC warmup-loop """
         self.status = "Warmup"
+        # QMC loop
         for sweep, i, l in self.loop_generator(self.warm_sweeps):
             m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
-            ratio = self._ratio(i, l, m_up, m_dn)
+            d_up = 1 + (1 - np.linalg.inv(m_up)[i, i]) * (np.exp(-2 * self.lamb * self.config[i, l]) - 1)
+            d_dn = 1 + (1 - np.linalg.inv(m_dn)[i, i]) * (np.exp(+2 * self.lamb * self.config[i, l]) - 1)
+            ratio = d_up * d_dn
             acc = np.random.rand() < ratio
             if acc:
                 self.config.update(i, l)
 
     def measure_loop(self):
+        r""" Runs the fast version of the LQMC measurement-loop and returns the Green's function.
+
+        Returns
+        -------
+        gf_dn: (M, N, N) np.ndarray
+            Measured spin-up Green's function .math'G_\uparrow(\tau)' for all M time slices.
+        gf_dn: (M, N, N) np.ndarray
+            Measured spin-down Green's function .math'G_\downarrow(\tau)' for all M time slices.
+        """
         self.status = "Measurement"
         n = self.model.n_sites
         # Initialize total and temp greens functions
@@ -459,7 +592,9 @@ class LatticeQMC:
         number = 0
         for sweep, i, l in self.loop_generator(self.meas_sweeps):
             m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
-            ratio = self._ratio(i, l, m_up, m_dn)
+            d_up = 1 + (1 - np.linalg.inv(m_up)[i, i]) * (np.exp(-2 * self.lamb * self.config[i, l]) - 1)
+            d_dn = 1 + (1 - np.linalg.inv(m_dn)[i, i]) * (np.exp(+2 * self.lamb * self.config[i, l]) - 1)
+            ratio = d_up * d_dn
             acc = np.random.rand() < ratio
             if acc:
                 # Move accepted: Update temp greens function and update configuration
@@ -478,6 +613,7 @@ class LatticeQMC:
 
                 # Update Configuration
                 self.config.update(i, l)
+
             # Add temp greens function to total gf after each step
             gf_up += g_tmp_up
             gf_dn += g_tmp_dn

@@ -15,10 +15,10 @@ import time
 import logging
 import numpy as np
 from lqmc import HubbardModel, Configuration
-from lqmc.lqmc import warmup_loop, measure_loop, check_params, print_filling
+from lqmc.lqmc import warmup_loop, measure_loop, check_params, print_filling, LatticeQMC
 
 # Configure basic logging for lqmc-loop
-logging.basicConfig(filename="lqmc.log", filemode="w", format='%(message)s', level=logging.DEBUG)
+# logging.basicConfig(filename="lqmc.log", filemode="w", format='%(message)s', level=logging.DEBUG)
 
 
 def save_gf_tau(model, beta, time_steps, gf):
@@ -118,13 +118,17 @@ def main():
     beta = 1 / temp
 
     # Simulation parameters
-    sweeps = 1000
-    time_steps = 50
+    sweeps = 100
+    time_steps = 10
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
 
-    gf_tau_up, gf_tau_dn = measure(model, beta, time_steps, sweeps, fast=True)
+    solver = LatticeQMC(model, beta, time_steps, sweeps)
+    solver.warmup_loop()
+    gf_tau_up, gf_tau_dn = solver.measure_loop()
+
+    # gf_tau_up, gf_tau_dn = measure(model, beta, time_steps, sweeps, fast=True)
     # gf_tau_up, gf_tau_dn = load_gf_tau(model, beta, time_steps)
 
     print_filling(gf_tau_up[0], gf_tau_dn[0])
