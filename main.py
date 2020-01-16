@@ -12,31 +12,14 @@ To do
 - Improve saving and loading
 """
 import time
+import logging
 import numpy as np
 from lqmc import HubbardModel, Configuration
 from lqmc.qmc_loop import warmup_loop, measure_loop
+from lqmc.utils import check_params, print_filling
 
-
-def check_params(u, t, dtau):
-    r""" Checks the configuration of the model and HS-field.
-
-    .. math::
-        U t \Delta\tau < \frac{1}{10}
-
-    Parameters
-    ----------
-    u: float
-        Hubbard interaction :math:`U`.
-    t: float
-        Hopping parameter :math:'t'.
-    dtau: float
-        Time slice size of the HS-field.
-    """
-    check_val = u * t * dtau**2
-    if check_val < 0.1:
-        print(f"Check-value {check_val:.2f} is smaller than 0.1!")
-    else:
-        print(f"Check-value {check_val:.2f} should be smaller than 0.1!")
+# Configure basic logging for lqmc-loop
+logging.basicConfig(filename="lqmc.log", filemode="w", format='%(message)s', level=logging.DEBUG)
 
 
 def save_gf_tau(model, beta, time_steps, gf):
@@ -46,7 +29,9 @@ def save_gf_tau(model, beta, time_steps, gf):
     -----
     Improve saving and loading
     """
-    file = f"data\\gf2_t={beta}_nt={time_steps}_{model.param_str()}.npy"
+    shape = model.lattice.shape
+    model_str = f"u={model.u}_t={model.t}_mu={model.mu}_w={shape[0]}_h={shape[1]}"
+    file = f"data\\gf_t={beta}_nt={time_steps}_{model_str}.npy"
     np.save(file, gf)
 
 
@@ -57,31 +42,31 @@ def load_gf_tau(model, beta, time_steps):
     -----
     Improve saving and loading
     """
-    file = f"data\\gf2_t={beta}_nt={time_steps}_{model.param_str()}.npy"
+    file = f"data\\gf_t={beta}_nt={time_steps}_{model.param_str()}.npy"
     return np.load(file)
 
 
-def filling(g_sigma):
-    r""" Computes the local filling of the model.
+def tau2iw_dft(gf_tau, beta):
+    r""" Discrete Fourier transform of the real Green's function `gf_tau`.
 
     Parameters
     ----------
-    g_sigma: (N, N) np.ndarray
-        Green's function .math'G_{\sigma}' of a spin channel.
-
+    gf_tau : (..., N_tau) float np.ndarray
+        The Green's function at imaginary times :math:`τ \in [0, β]`.
+    beta : float
+        The inverse temperature :math:`beta = 1/k_B T`.
     Returns
     -------
-    n: (N) np.ndarray
+    gf_iw : (..., {N_iw - 1}/2) float np.ndarray
+        The Fourier transform of `gf_tau` for positive fermionic Matsubara
+        frequencies :math:`iω_n`.
     """
-    return 1 - np.diagonal(g_sigma)
-
-
-def print_filling(gf_up, gf_dn):
-    n_up = filling(gf_up)
-    n_dn = filling(gf_dn)
-    print(f"<n↑> = {np.mean(n_up):.3f}  {n_up}")
-    print(f"<n↓> = {np.mean(n_dn):.3f}  {n_dn}")
-    print(f"<n>  = {np.mean(n_up + n_dn):.3f}")
+    # expand `gf_tau` to [-β, β] to get symmetric function
+    gf_tau_full_range = np.concatenate((-gf_tau[:-1, ...], gf_tau), axis=0)
+    dft = np.fft.ihfft(gf_tau_full_range[:-1, ...], axis=0)
+    # select *fermionic* Matsubara frequencies
+    gf_iw = -beta * dft[1::2, ...]
+    return gf_iw
 
 
 def measure(model, beta, time_steps, sweeps=1000, warmup_ratio=0.2, fast=True):
@@ -126,46 +111,25 @@ def measure(model, beta, time_steps, sweeps=1000, warmup_ratio=0.2, fast=True):
     return gf
 
 
-def tau2iw_dft(gf_tau, beta):
-    r""" Discrete Fourier transform of the real Green's function `gf_tau`.
-
-    Parameters
-    ----------
-    gf_tau : (..., N_tau) float np.ndarray
-        The Green's function at imaginary times :math:`τ \in [0, β]`.
-    beta : float
-        The inverse temperature :math:`beta = 1/k_B T`.
-    Returns
-    -------
-    gf_iw : (..., {N_iw - 1}/2) float np.ndarray
-        The Fourier transform of `gf_tau` for positive fermionic Matsubara
-        frequencies :math:`iω_n`.
-    """
-    # expand `gf_tau` to [-β, β] to get symmetric function
-    gf_tau_full_range = np.concatenate((-gf_tau[:-1, ...], gf_tau), axis=0)
-    dft = np.fft.ihfft(gf_tau_full_range[:-1, ...], axis=0)
-    # select *fermionic* Matsubara frequencies
-    gf_iw = -beta * dft[1::2, ...]
-    return gf_iw
-
-
 def main():
-    n_sites = 10
+    # Model parameters
+    n_sites = 5
     u, t = 2, 1
     temp = 2
     beta = 1 / temp
-    time_steps = 10
+
+    # Simulation parameters
+    sweeps = 1000
+    time_steps = 50
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
 
+    gf_tau_up, gf_tau_dn = measure(model, beta, time_steps, sweeps, fast=True)
     # gf_tau_up, gf_tau_dn = load_gf_tau(model, beta, time_steps)
 
-    gf_tau_up, gf_tau_dn = measure(model, beta, time_steps, sweeps=100, fast=False)
     print_filling(gf_tau_up[0], gf_tau_dn[0])
     print()
-    gf_tau_up, gf_tau_dn = measure(model, beta, time_steps, sweeps=100, fast=True)
-    print_filling(gf_tau_up[0], gf_tau_dn[0])
 
 
 if __name__ == "__main__":

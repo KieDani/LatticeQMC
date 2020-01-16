@@ -7,18 +7,15 @@ version: 1.0
 
 To Do
 -----
-- Efficiency
+- Make console output thread-safe
 - Green's function time slices
+- Efficiency
 """
 import logging
 import itertools
 import numpy as np
 from scipy.linalg import expm
 from lqmc import HubbardModel, Configuration
-
-# Configure basic logging for lqmc-loop
-log_file = 'data\\lqmc.log'
-logging.basicConfig(filename=log_file, filemode="w", format='%(message)s', level=logging.DEBUG)
 
 
 def updateln(string):
@@ -176,24 +173,22 @@ def warmup_loop(model, config, dtau, sweeps=200, fast=True):
         The updated HS-field configuration after the warmup loop.
     """
     ham_kin = model.ham_kinetic()
-
     # Calculate factor
     lamb = compute_lambda(model.u, dtau)
-
-    # Calculate m-matrices
+    # Calculate M matrices
     m_up = compute_m(ham_kin, config, lamb, dtau, sigma=+1)
     m_dn = compute_m(ham_kin, config, lamb, dtau, sigma=-1)
     old = np.linalg.det(m_up) * np.linalg.det(m_dn)
-
-    # Store copy of current configuration
+    # Store copy of current configuration (only used for slow algorith)
     old_config = config.copy()
+
     # QMC loop
     acc = False
     ratio = 0
-    updateln("Warmup sweep")
+    # updateln("Warmup sweep")
     for sweep in range(sweeps):
         for i, l in itertools.product(range(model.n_sites), range(config.n_t)):
-            updateln(f"Warmup sweep: {sweep+1}/{sweeps}, accepted: {acc} (ratio={ratio:.2f})")
+            # updateln(f"Warmup sweep: {sweep+1}/{sweeps}, accepted: {acc} (ratio={ratio:.2f})")
             if fast:
                 # Calculate m-matrices and ratio of the configurations
                 # Accept move with metropolis acceptance ratio.
@@ -204,8 +199,7 @@ def warmup_loop(model, config, dtau, sweeps=200, fast=True):
                 ratio = d_up * d_dn
                 r = np.random.rand()  # Random number between 0 and 1
                 if r < ratio:
-                    # Move accepted:
-                    # Update configuration
+                    # Move accepted: Update configuration
                     acc = True
                     config.update(i, l)
                 else:
@@ -222,18 +216,16 @@ def warmup_loop(model, config, dtau, sweeps=200, fast=True):
                 ratio = new / old
                 r = np.random.rand()  # Random number between 0 and 1
                 if r < ratio:
-                    # Move accepted:
-                    # Continue using the new configuration
+                    # Move accepted: Continue using the new configuration
                     acc = True
                     old = new
                     old_config = config.copy()
                 else:
-                    # Move not accepted:
-                    # Revert to the old configuration
+                    # Move not accepted: Revert to the old configuration
                     acc = False
                     config = old_config
 
-            logging.info(f"[Warmup] Sweep={sweep} i={i}, l={l} - ratio={ratio:.3f}, accepted={acc}")
+            # logging.info(f"[Warmup] Sweep={sweep} i={i}, l={l} - ratio={ratio:.3f}, accepted={acc}")
     print()
     return config
 
@@ -264,35 +256,29 @@ def measure_loop(model, config, dtau, sweeps=800, fast=True):
     """
     ham_kin = model.ham_kinetic()
     n = model.n_sites
-
     # Calculate factor
     lamb = compute_lambda(model.u, dtau)
-
-    # Calculate m-matrices
+    # Calculate M matrices
     m_up = compute_m(ham_kin, config, lamb, dtau, sigma=+1)
     m_dn = compute_m(ham_kin, config, lamb, dtau, sigma=-1)
     old = np.linalg.det(m_up) * np.linalg.det(m_dn)
-
     # Initialize total and temp greens functions
     gf_up, gf_dn = 0, 0
     g_beta_up = np.linalg.inv(m_up)
     g_beta_dn = np.linalg.inv(m_dn)
-
-    # Compute Greens function for all time steps using the gf at time beta
     g_tmp_up = compute_gf_tau(config, ham_kin, g_beta_up, lamb, dtau, sigma=+1)
     g_tmp_dn = compute_gf_tau(config, ham_kin, g_beta_dn, lamb, dtau, sigma=-1)
-
-    # Store copy of current configuration
+    # Store copy of current configuration (only used for slow algorith)
     old_config = config.copy()
 
     # QMC loop
     acc = False
     ratio = 0
     number = 0
-    updateln("Measurement sweep")
+    # updateln("Measurement sweep")
     for sweep in range(sweeps):
         for i, l in itertools.product(range(model.n_sites), range(config.n_t)):
-            updateln(f"Measurement sweep: {sweep+1}/{sweeps}, accepted: {acc} (ratio={ratio:.2f})")
+            # updateln(f"Measurement sweep: {sweep+1}/{sweeps}, accepted: {acc} (ratio={ratio:.2f})")
 
             if fast:
                 # Calculate m-matrices and ratio of the configurations
@@ -304,8 +290,7 @@ def measure_loop(model, config, dtau, sweeps=800, fast=True):
                 ratio = d_up * d_dn
                 r = np.random.rand()  # Random number between 0 and 1
                 if r < ratio:
-                    # Move accepted:
-                    # Update temp greens function and update configuration
+                    # Move accepted: Update temp greens function and update configuration
                     c_up = np.zeros(n, dtype=np.float64)
                     c_dn = np.zeros(n, dtype=np.float64)
                     c_up[i] = np.exp(-2 * lamb * config[i, l]) - 1
@@ -321,12 +306,11 @@ def measure_loop(model, config, dtau, sweeps=800, fast=True):
                     g_tmp_up = compute_gf_tau(config, ham_kin, g_beta_up, lamb, dtau, sigma=+1)
                     g_tmp_dn = compute_gf_tau(config, ham_kin, g_beta_dn, lamb, dtau, sigma=-1)
 
-                    acc = True
                     # Update Configuration
+                    acc = True
                     config.update(i, l)
                 else:
-                    # Move not accepted:
-                    # Revert to the old configuration
+                    # Move not accepted!
                     acc = False
             else:
                 # Update Configuration
@@ -360,7 +344,98 @@ def measure_loop(model, config, dtau, sweeps=800, fast=True):
             gf_dn += g_tmp_dn
             number += 1
 
-            logging.info(f"[Measure] Sweep={sweep} i={i}, l={l} - ratio={ratio:.3f}, accepted={acc}")
+            # logging.info(f"[Measure] Sweep={sweep} i={i}, l={l} - ratio={ratio:.3f}, accepted={acc}")
     print()
     # Return the normalized gfs for each spin
     return np.array([gf_up, gf_dn]) / number
+
+
+class LatticeQMC:
+    """ Fast implementation"""
+
+    def __init__(self, model, beta, time_steps, sweeps=1000, warmup_ratio=0.2):
+        self.model = model
+        self.dtau = beta / time_steps
+        self.warm_sweeps = int(sweeps * warmup_ratio)
+        self.meas_sweeps = sweeps - self.warm_sweeps
+
+        self.config = Configuration(model.n_sites, time_steps)
+        self.ham_kin = self.model.ham_kinetic()
+        self.lamb = compute_lambda(self.model.u, self.dtau)
+
+        self.status = ""
+        self.it = 0
+
+    def loop_generator(self, sweeps):
+        for sweep in range(sweeps):
+            self.it = sweep
+            for i, l in itertools.product(range(self.model.n_sites), range(self.config.n_t)):
+                print(f"\r{self.status} Sweep {sweep} [{i}, {l}]", end="", flush=True)
+                yield sweep, i, l
+
+    def _compute_m(self):
+        m_up = compute_m(self.ham_kin, self.config, self.lamb, self.dtau, sigma=+1)
+        m_dn = compute_m(self.ham_kin, self.config, self.lamb, self.dtau, sigma=-1)
+        return m_up, m_dn
+
+    def _ratio(self, i, l, m_up, m_dn):
+        d_up = 1 + (1 - np.linalg.inv(m_up)[i, i]) * (np.exp(-2 * self.lamb * self.config[i, l]) - 1)
+        d_dn = 1 + (1 - np.linalg.inv(m_dn)[i, i]) * (np.exp(+2 * self.lamb * self.config[i, l]) - 1)
+        return d_up * d_dn
+
+    def _compute_gf_tau(self, g_beta_up, g_beta_dn):
+        g_tau_up = compute_gf_tau(self.config, self.ham_kin, g_beta_up, self.lamb, self.dtau, sigma=+1)
+        g_tau_dn = compute_gf_tau(self.config, self.ham_kin, g_beta_dn, self.lamb, self.dtau, sigma=-1)
+        return g_tau_up, g_tau_dn
+
+    def log_iterstep(self, sweep, i, l, ratio, acc):
+        logging.debug(f"{self.status} {sweep} i={i}, l={l} - ratio={ratio:.3f}, accepted={acc}")
+
+    def warmup_loop(self):
+        self.status = "Warmup"
+        for sweep, i, l in self.loop_generator(self.warm_sweeps):
+            m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
+            ratio = self._ratio(i, l, m_up, m_dn)
+            acc = np.random.rand() < ratio
+            if acc:
+                self.config.update(i, l)
+
+    def measure_loop(self):
+        self.status = "Measurement"
+        n = self.model.n_sites
+        # Initialize total and temp greens functions
+        gf_up, gf_dn = 0, 0
+        m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
+        g_beta_up = np.linalg.inv(m_up)
+        g_beta_dn = np.linalg.inv(m_dn)
+        g_tmp_up, g_tmp_dn = self._compute_gf_tau(g_beta_up, g_beta_dn)
+
+        # QMC loop
+        number = 0
+        for sweep, i, l in self.loop_generator(self.meas_sweeps):
+            m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
+            ratio = self._ratio(i, l, m_up, m_dn)
+            acc = np.random.rand() < ratio
+            if acc:
+                # Move accepted: Update temp greens function and update configuration
+                c_up = np.zeros(n, dtype=np.float64)
+                c_dn = np.zeros(n, dtype=np.float64)
+                c_up[i] = np.exp(-2 * self.lamb * self.config[i, l]) - 1
+                c_dn[i] = np.exp(+2 * self.lamb * self.config[i, l]) - 1
+                c_up = -1 * (np.exp(-2 * self.lamb * self.config[i, l]) - 1) * g_beta_up[i, :] + c_up
+                c_dn = -1 * (np.exp(+2 * self.lamb * self.config[i, l]) - 1) * g_beta_dn[i, :] + c_dn
+                b_up = g_beta_up[:, i] / (1. + c_up[i])
+                b_dn = g_beta_dn[:, i] / (1. + c_dn[i])
+
+                g_beta_up = g_beta_up - np.outer(b_up, c_up)
+                g_beta_dn = g_beta_dn - np.outer(b_dn, c_dn)
+                g_tmp_up, g_tmp_dn = self._compute_gf_tau(g_beta_up, g_beta_dn)
+
+                # Update Configuration
+                self.config.update(i, l)
+            # Add temp greens function to total gf after each step
+            gf_up += g_tmp_up
+            gf_dn += g_tmp_dn
+            number += 1
+        # Return the normalized gfs for each spin
+        return np.array([gf_up, gf_dn]) / number
