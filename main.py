@@ -15,8 +15,7 @@ import time
 import logging
 import numpy as np
 from lqmc import HubbardModel, Configuration
-from lqmc.qmc_loop import warmup_loop, measure_loop
-from lqmc.utils import check_params, print_filling
+from lqmc.lqmc import warmup_loop, measure_loop, check_params, print_filling
 
 # Configure basic logging for lqmc-loop
 logging.basicConfig(filename="lqmc.log", filemode="w", format='%(message)s', level=logging.DEBUG)
