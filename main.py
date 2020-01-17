@@ -171,8 +171,8 @@ def main():
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
 
-    # g_tau = measure(model, beta, time_steps, sweeps)
-    # save_gf_tau(model, beta, time_steps, g_tau)
+    g_tau = measure(model, beta, time_steps, sweeps)
+    save_gf_tau(model, beta, time_steps, g_tau)
     g_tau = load_gf_tau(model, beta, time_steps)
 
     # Revert the time axis to be '[0, \beta]'
@@ -181,7 +181,6 @@ def main():
     print(gf_up.shape)
     plot_gf_tau(beta, gf_up)
     plt.show()
-
 
 
 if __name__ == "__main__":

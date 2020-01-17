@@ -81,7 +81,7 @@ def compute_m(ham_kin, config, lamb, dtau, sigma):
 
     # Calculate the first matrix exp of B. This is a static value.
     # check if there is a better way to calculate the matrix exponential
-    exp_k = expm(dtau * ham_kin)
+    exp_k = expm(- dtau * ham_kin)
     # Create the V_l matrix
     v = np.zeros((n, n), dtype=config.dtype)
 
@@ -89,14 +89,14 @@ def compute_m(ham_kin, config, lamb, dtau, sigma):
     lmax = config.time_steps - 1
 
     np.fill_diagonal(v, config[:, lmax])
-    exp_v = expm(sigma * lamb * v)
+    exp_v = expm(- sigma * lamb * v)
     b = np.dot(exp_k, exp_v)
 
     b_prod = b
     for l in reversed(range(1, lmax)):
         # Fill V_l with new values, compute B(l) and multiply with total product
         np.fill_diagonal(v, config[:, l])
-        exp_v = expm(sigma * lamb * v)
+        exp_v = expm(- sigma * lamb * v)
         b = np.dot(exp_k, exp_v)
         b_prod = np.dot(b_prod, b)
 
