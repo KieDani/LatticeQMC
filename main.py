@@ -18,6 +18,7 @@ from lqmc import HubbardModel, check_params
 from lqmc.lqmc import LatticeQMC
 from lqmc.muliprocessing import LqmcProcessManager
 
+
 # Configure basic logging for lqmc-loop
 # logging.basicConfig(filename="lqmc.log", filemode="w", format='%(message)s', level=logging.DEBUG)
 
@@ -65,8 +66,8 @@ def measure_single_process(model, beta, time_steps, sweeps, warmup_ratio=0.2):
     return gf_tau
 
 
-def measure_multi_process(model, beta, time_steps, sweeps, warmup_ratio=0.2, cores=None):
-    manager = LqmcProcessManager(cores)
+def measure_multi_process(model, beta, time_steps, sweeps, warmup_ratio=0.2):
+    manager = LqmcProcessManager()
     manager.init(model, beta, time_steps, sweeps, warmup_ratio)
 
     manager.start()
@@ -106,12 +107,13 @@ def measure(model, beta, time_steps, sweeps, warmup_ratio=0.2, mp=True):
         gf_tau = measure_multi_process(model, beta, time_steps, sweeps, warmup_ratio)
     else:
         gf_tau = measure_single_process(model, beta, time_steps, sweeps, warmup_ratio)
+
+    # Revert the time axis to be '[0, \beta]'
     return gf_tau
 
 
 def tau2iw_dft(gf_tau, beta):
     r""" Discrete Fourier transform of the real Green's function `gf_tau`.
-
     Parameters
     ----------
     gf_tau : (..., N_tau) float np.ndarray
@@ -134,12 +136,10 @@ def tau2iw_dft(gf_tau, beta):
 
 def get_local_gf_tau(g_tau):
     """ Returns the local elements (diagonal) of the Green's function matrix
-
     Parameters
     ----------
     g_tau: (...M, N, N) array_like
         Green's function matrices for M time steps and N sites
-
     Returns
     -------
     gf_tau: (..., M, N) np.ndarray
@@ -160,20 +160,23 @@ def plot_gf_tau(beta, gf):
     ax.legend()
 
 
+
 def main():
+    # Model parameters
     n_sites = 5
     u, t = 2, 1
-    temp = 1
+    temp = 2
     beta = 1 / temp
-    sweeps = 100
-    time_steps = 10
+    # Simulation parameters
+    sweeps = 1000
+    time_steps = 25
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
 
     g_tau = measure(model, beta, time_steps, sweeps)
     save_gf_tau(model, beta, time_steps, g_tau)
-    g_tau = load_gf_tau(model, beta, time_steps)
+    # g_tau = load_gf_tau(model, beta, time_steps)
 
     # Revert the time axis to be '[0, \beta]'
     gf_up, gf_dn = get_local_gf_tau(g_tau)

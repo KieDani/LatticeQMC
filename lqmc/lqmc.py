@@ -133,6 +133,7 @@ def compute_gf_tau(config, ham_kin, g_beta, lamb, dtau, sigma):
     # Calculate the first matrix exp of B. This is a static value.
     # check if there is a better way to calculate the matrix exponential
     exp_k = expm(dtau * ham_kin)
+    exp_min_k = expm(-1 * dtau * ham_kin)
 
     v = np.zeros((n, n), dtype=config.dtype)
 
@@ -143,8 +144,11 @@ def compute_gf_tau(config, ham_kin, g_beta, lamb, dtau, sigma):
         # Create the V_l matrix
         np.fill_diagonal(v, config[:, l])
         exp_v = expm(sigma * lamb * v)
+        exp_min_v = expm(-1 * sigma * lamb * v)
+
         b = np.dot(exp_k, exp_v)
-        g[l, :, :] = np.dot(np.dot(b, g[l-1, :, :]), np.linalg.inv(b))
+        b_min = np.dot(exp_min_k, exp_min_v)
+        g[l, :, :] = np.dot(np.dot(b, g[l-1, :, :]), np.linalg.inv(b_min))
     return g
 
 
