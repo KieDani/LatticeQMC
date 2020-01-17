@@ -115,14 +115,14 @@ def plot_gf_tau(beta, gf):
 
 def main():
     # Model parameters
-    n_sites = 5
+    n_sites = 10
     u, t = 2, 1
     temp = 2
     beta = 1 / temp
     # Simulation parameters
-    time_steps = 10
-    sweeps = 1000
-    cores = 5
+    time_steps = 20
+    sweeps = 10000
+    cores = None  # None to use all cores of the cpu
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
@@ -131,7 +131,7 @@ def main():
         g_tau = load_gf_tau(model, beta, time_steps, sweeps)
         print("GF data loaded")
     except FileNotFoundError:
-        print("Found not data...")
+        print("Found no data...")
         g_tau = measure(model, beta, time_steps, sweeps, cores=cores)
         save_gf_tau(model, beta, time_steps, sweeps, g_tau)
 
