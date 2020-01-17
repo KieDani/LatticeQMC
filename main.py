@@ -127,7 +127,9 @@ def measure(model, beta, time_steps, sweeps, warmup_ratio=0.2, mp=True):
         gf_tau = measure_multi_process(model, beta, time_steps, sweeps, warmup_ratio)
     else:
         gf_tau = measure_single_process(model, beta, time_steps, sweeps, warmup_ratio)
-    return gf_tau
+
+    # Revert the time axis to be '[0, \beta]'
+    return gf_tau[::-1, ...]
 
 
 def main():
