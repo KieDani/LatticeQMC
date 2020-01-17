@@ -130,7 +130,7 @@ def measure(model, beta, time_steps, sweeps, warmup_ratio=0.2, mp=True):
         gf_tau = measure_single_process(model, beta, time_steps, sweeps, warmup_ratio)
 
     # Revert the time axis to be '[0, \beta]'
-    return gf_tau[::-1, ...]
+    return gf_tau
 
 
 
@@ -139,7 +139,6 @@ def measure(model, beta, time_steps, sweeps, warmup_ratio=0.2, mp=True):
 
 def tau2iw_dft(gf_tau, beta):
     r""" Discrete Fourier transform of the real Green's function `gf_tau`.
-
     Parameters
     ----------
     gf_tau : (..., N_tau) float np.ndarray
@@ -162,16 +161,15 @@ def tau2iw_dft(gf_tau, beta):
 
 def get_local_gf_tau(g_tau):
     """ Returns the local elements (diagonal) of the Green's function matrix
-
     Parameters
     ----------
-    g_tau: (..., N, N) array_like
-        Green's function matrices
-
+    g_tau: (...M, N, N) array_like
+        Green's function matrices for M time steps and N sites
     Returns
     -------
-    gf_tau: (..., N) np.ndarray
+    gf_tau: (..., M, N) np.ndarray
     """
+    g_tau = g_tau[..., ::-1, :, :]
     return np.diagonal(g_tau, axis1=-2, axis2=-1)
 
 
@@ -207,12 +205,14 @@ def main():
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
 
-    g_tau = measure(model, beta, time_steps, sweeps, mp=True)
+    g_tau = measure(model, beta, time_steps, sweeps)
     save_gf_tau(model, beta, time_steps, g_tau)
-    # g_tau = load_gf_tau(model, beta, time_steps)
-    print()
+    #g_tau = load_gf_tau(model, beta, time_steps)
 
+    # Revert the time axis to be '[0, \beta]'
     gf_up, gf_dn = get_local_gf_tau(g_tau)
+
+    print(gf_up.shape)
     plot_gf_tau(beta, gf_up)
     plt.show()
 
