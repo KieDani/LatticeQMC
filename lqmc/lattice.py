@@ -991,6 +991,40 @@ class Lattice:
         self._set_chache(shape, indices, neighbours)
         return indices, neighbours
 
+    def set_periodic_boundary(self):
+        """ Adds the indices of the neighbors cycled around the x-axis.
+
+        To Do:
+        ------
+        Add cycling along all axis. Currently only the x-direction is supported.
+        """
+        # Window size used for searching for neighbours
+        window = int((self.n_dist + 1) * self.slice_sites)
+        indices_1 = np.arange(window)
+        indices_2 = self.n_sites - indices_1 - 1
+
+        # Check the maximal distance of cells in x-direction
+        celldist_max_x = 0.0
+        for i in indices_1:
+            nx1 = self.indices[i, 0]
+            for j in indices_2:
+                nx2 = self.indices[j, 0]
+                delta = float(nx2 - nx1)
+                if delta > celldist_max_x:
+                    celldist_max_x = delta
+
+        # Add the cycling neighbour indices to the chached list.
+        for i_dist in range(self.n_dist):
+            for i in indices_1:
+                pos1 = self.position(i)
+                for j in indices_2:
+                    pos2 = self.position(j)
+                    dist_offset = 0 if i_dist == 0 else self.distances[i_dist - 1]
+                    dist = np.round(distance(pos1, pos2), decimals=self.DIST_DECIMALS)
+                    if dist == celldist_max_x + dist_offset:
+                        self.neighbours[i][i_dist].append(j)
+                        self.neighbours[j][i_dist].append(i)
+
     def show(self, show=True, size=10., color=True, margins=1., show_hop=True, lw=1.):
         """ Plot the cached lattice
 

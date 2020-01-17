@@ -121,8 +121,8 @@ def main():
     beta = 1 / temp
     # Simulation parameters
     time_steps = 20
-    sweeps = 10000
-    cores = None  # None to use all cores of the cpu
+    sweeps = 20000
+    cores = 5  # None to use all cores of the cpu
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
