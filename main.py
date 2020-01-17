@@ -17,6 +17,7 @@ import numpy as np
 from lqmc import HubbardModel, check_params, print_filling
 from lqmc.lqmc import LatticeQMC
 from lqmc.muliprocessing import LqmcProcessManager
+import matplotlib.pyplot as plt
 
 # Configure basic logging for lqmc-loop
 # logging.basicConfig(filename="lqmc.log", filemode="w", format='%(message)s', level=logging.DEBUG)
@@ -206,13 +207,14 @@ def main():
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
 
-    gf_tau = measure(model, beta, time_steps, sweeps, mp=True)
-    save_gf_tau(model, beta, time_steps, gf_tau)
-    # gf_tau = load_gf_tau(model, beta, time_steps)
-
-    gf_tau_up, gf_tau_dn = gf_tau
-    print_filling(gf_tau_up[5], gf_tau_dn[5])
+    g_tau = measure(model, beta, time_steps, sweeps, mp=True)
+    save_gf_tau(model, beta, time_steps, g_tau)
+    # g_tau = load_gf_tau(model, beta, time_steps)
     print()
+
+    gf_up, gf_dn = get_local_gf_tau(g_tau)
+    plot_gf_tau(beta, gf_up)
+    plt.show()
 
 
 if __name__ == "__main__":
