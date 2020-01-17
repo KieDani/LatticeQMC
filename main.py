@@ -7,14 +7,14 @@ version: 1.0
 
 To do
 -----
-- Multiproccesing
-- M-matrix inner func (??)
 - Improve saving and loading
 """
+import os
 import time
 import logging
 import numpy as np
-from lqmc import HubbardModel, check_params, print_filling
+import matplotlib.pyplot as plt
+from lqmc import HubbardModel, check_params, print_filling, local_gf
 from lqmc.lqmc import LatticeQMC
 from lqmc.muliprocessing import LqmcProcessManager
 
@@ -24,15 +24,15 @@ from lqmc.muliprocessing import LqmcProcessManager
 
 def save_gf_tau(model, beta, time_steps, gf):
     """ Save time depended Green's function measurement data
-
-    To Do
-    -----
-    Improve saving and loading
+    into the tree
     """
-    shape = model.lattice.shape
-    model_str = f"u={model.u}_t={model.t}_mu={model.mu}_w={shape[0]}_h={shape[1]}"
-    file = f"data\\gf_t={beta}_nt={time_steps}_{model_str}.npy"
-    np.save(file, gf)
+    w, h = model.lattice.shape
+    folder = f"data\\u={model.u}_t={model.t}_mu={model.mu}_w={w}_h={h}"
+    if not os.path.isdir(folder):
+        os.makedirs(folder)
+    file = f"gf_t={beta}_nt={time_steps}.npy"
+    os.path.join(folder, file)
+    np.save(os.path.join(folder, file), gf)
 
 
 def load_gf_tau(model, beta, time_steps):
@@ -42,31 +42,10 @@ def load_gf_tau(model, beta, time_steps):
     -----
     Improve saving and loading
     """
-    file = f"data\\gf_t={beta}_nt={time_steps}_{model.param_str()}.npy"
-    return np.load(file)
-
-
-def tau2iw_dft(gf_tau, beta):
-    r""" Discrete Fourier transform of the real Green's function `gf_tau`.
-
-    Parameters
-    ----------
-    gf_tau : (..., N_tau) float np.ndarray
-        The Green's function at imaginary times :math:`τ \in [0, β]`.
-    beta : float
-        The inverse temperature :math:`beta = 1/k_B T`.
-    Returns
-    -------
-    gf_iw : (..., {N_iw - 1}/2) float np.ndarray
-        The Fourier transform of `gf_tau` for positive fermionic Matsubara
-        frequencies :math:`iω_n`.
-    """
-    # expand `gf_tau` to [-β, β] to get symmetric function
-    gf_tau_full_range = np.concatenate((-gf_tau[:-1, ...], gf_tau), axis=0)
-    dft = np.fft.ihfft(gf_tau_full_range[:-1, ...], axis=0)
-    # select *fermionic* Matsubara frequencies
-    gf_iw = -beta * dft[1::2, ...]
-    return gf_iw
+    w, h = model.lattice.shape
+    folder = f"data\\u={model.u}_t={model.t}_mu={model.mu}_w={w}_h={h}"
+    file = f"gf_t={beta}_nt={time_steps}.npy"
+    return np.load(os.path.join(folder, file))
 
 
 def measure_single_process(model, beta, time_steps, sweeps, warmup_ratio=0.2):
@@ -86,8 +65,8 @@ def measure_single_process(model, beta, time_steps, sweeps, warmup_ratio=0.2):
     return gf_tau
 
 
-def measure_multi_process(model, beta, time_steps, sweeps, warmup_ratio=0.2):
-    manager = LqmcProcessManager(2)
+def measure_multi_process(model, beta, time_steps, sweeps, warmup_ratio=0.2, cores=None):
+    manager = LqmcProcessManager(cores)
     manager.init(model, beta, time_steps, sweeps, warmup_ratio)
 
     manager.start()
@@ -127,29 +106,84 @@ def measure(model, beta, time_steps, sweeps, warmup_ratio=0.2, mp=True):
         gf_tau = measure_multi_process(model, beta, time_steps, sweeps, warmup_ratio)
     else:
         gf_tau = measure_single_process(model, beta, time_steps, sweeps, warmup_ratio)
-    return gf_tau
+
+    # Revert the time axis to be '[0, \beta]'
+    return gf_tau[::-1, ...]
+
+
+def tau2iw_dft(gf_tau, beta):
+    r""" Discrete Fourier transform of the real Green's function `gf_tau`.
+
+    Parameters
+    ----------
+    gf_tau : (..., N_tau) float np.ndarray
+        The Green's function at imaginary times :math:`τ \in [0, β]`.
+    beta : float
+        The inverse temperature :math:`beta = 1/k_B T`.
+    Returns
+    -------
+    gf_iw : (..., {N_iw - 1}/2) float np.ndarray
+        The Fourier transform of `gf_tau` for positive fermionic Matsubara
+        frequencies :math:`iω_n`.
+    """
+    # expand `gf_tau` to [-β, β] to get symmetric function
+    gf_tau_full_range = np.concatenate((-gf_tau[:-1, ...], gf_tau), axis=0)
+    dft = np.fft.ihfft(gf_tau_full_range[:-1, ...], axis=0)
+    # select *fermionic* Matsubara frequencies
+    gf_iw = -beta * dft[1::2, ...]
+    return gf_iw
+
+
+def get_local_gf_tau(g_tau):
+    """ Returns the local elements (diagonal) of the Green's function matrix
+
+    Parameters
+    ----------
+    g_tau: (..., N, N) array_like
+        Green's function matrices
+
+    Returns
+    -------
+    gf_tau: (..., N) np.ndarray
+    """
+    return np.diagonal(g_tau, axis1=-2, axis2=-1)
+
+
+def plot_gf_tau(beta, gf):
+    tau = np.linspace(0, beta, gf.shape[0])
+    fig, ax = plt.subplots()
+    ax.grid()
+    ax.set_xlim(0, beta)
+    ax.set_xlabel(r"$\tau$")
+    ax.set_ylabel(r"$G(\tau)$")
+    for i, y in enumerate(gf.T):
+        ax.plot(tau, y, label="$G_{" + f"{i}, {i}" + "}$")
+    ax.legend()
 
 
 def main():
     # Model parameters
     n_sites = 5
     u, t = 2, 1
-    temp = 2
+    temp = 1
     beta = 1 / temp
     # Simulation parameters
-    sweeps = 200
+    sweeps = 100
     time_steps = 10
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
 
-    gf_tau = measure(model, beta, time_steps, sweeps, mp=True)
-    save_gf_tau(model, beta, time_steps, gf_tau)
-    # gf_tau = load_gf_tau(model, beta, time_steps)
+    # g_tau = measure_multi_process(model, beta, time_steps, sweeps)
+    # save_gf_tau(model, beta, time_steps, g_tau)
+    g_tau = load_gf_tau(model, beta, time_steps)
 
-    gf_tau_up, gf_tau_dn = gf_tau
-    print_filling(gf_tau_up[0], gf_tau_dn[0])
+    g_tau_up, g_tau_dn = g_tau
     print()
+
+    gf_up, gf_dn = get_local_gf_tau(g_tau)
+    plot_gf_tau(beta, gf_up)
+    plt.show()
 
 
 if __name__ == "__main__":

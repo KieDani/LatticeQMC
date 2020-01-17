@@ -7,7 +7,6 @@ version: 1.0
 
 To Do
 -----
-- Make console output thread-safe
 - Green's function time slices
 - Efficiency
 """
@@ -144,7 +143,6 @@ def compute_gf_tau(config, ham_kin, g_beta, lamb, dtau, sigma):
         # Create the V_l matrix
         np.fill_diagonal(v, config[:, l])
         exp_v = expm(sigma * lamb * v)
-
         b = np.dot(exp_k, exp_v)
         g[l, :, :] = np.dot(np.dot(b, g[l-1, :, :]), np.linalg.inv(b))
     return g

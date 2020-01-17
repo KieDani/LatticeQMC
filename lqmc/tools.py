@@ -12,7 +12,7 @@ def check_params(u, t, dtau):
     r""" Checks the configuration of the model and HS-field.
 
     .. math::
-        U t \Delta\tau < \frac{1}{10}
+        U t (\Delta\tau)^2 < \frac{1}{10}
 
     Parameters
     ----------
@@ -25,9 +25,9 @@ def check_params(u, t, dtau):
     """
     check_val = u * t * dtau**2
     if check_val < 0.1:
-        print(f"Check-value {check_val:.2f} is smaller than 0.1!")
+        print(f"Check-value {check_val:.2} is smaller than 0.1!")
     else:
-        print(f"Check-value {check_val:.2f} should be smaller than 0.1!")
+        print(f"Check-value {check_val:.2} should be smaller than 0.1!")
 
 
 def filling(g_sigma):
