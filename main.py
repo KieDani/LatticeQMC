@@ -138,7 +138,7 @@ def main():
     beta = 1 / temp
     # Simulation parameters
     sweeps = 1000
-    time_steps = 35
+    time_steps = 25
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
@@ -148,7 +148,7 @@ def main():
     # gf_tau = load_gf_tau(model, beta, time_steps)
 
     gf_tau_up, gf_tau_dn = gf_tau
-    print_filling(gf_tau_up[0], gf_tau_dn[0])
+    print_filling(gf_tau_up[5], gf_tau_dn[5])
     print()
 
 
