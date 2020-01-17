@@ -132,6 +132,67 @@ def measure(model, beta, time_steps, sweeps, warmup_ratio=0.2, mp=True):
     return gf_tau[::-1, ...]
 
 
+
+
+
+
+def tau2iw_dft(gf_tau, beta):
+    r""" Discrete Fourier transform of the real Green's function `gf_tau`.
+
+    Parameters
+    ----------
+    gf_tau : (..., N_tau) float np.ndarray
+        The Green's function at imaginary times :math:`τ \in [0, β]`.
+    beta : float
+        The inverse temperature :math:`beta = 1/k_B T`.
+    Returns
+    -------
+    gf_iw : (..., {N_iw - 1}/2) float np.ndarray
+        The Fourier transform of `gf_tau` for positive fermionic Matsubara
+        frequencies :math:`iω_n`.
+    """
+    # expand `gf_tau` to [-β, β] to get symmetric function
+    gf_tau_full_range = np.concatenate((-gf_tau[:-1, ...], gf_tau), axis=0)
+    dft = np.fft.ihfft(gf_tau_full_range[:-1, ...], axis=0)
+    # select *fermionic* Matsubara frequencies
+    gf_iw = -beta * dft[1::2, ...]
+    return gf_iw
+
+
+def get_local_gf_tau(g_tau):
+    """ Returns the local elements (diagonal) of the Green's function matrix
+
+    Parameters
+    ----------
+    g_tau: (..., N, N) array_like
+        Green's function matrices
+
+    Returns
+    -------
+    gf_tau: (..., N) np.ndarray
+    """
+    return np.diagonal(g_tau, axis1=-2, axis2=-1)
+
+
+def plot_gf_tau(beta, gf):
+    tau = np.linspace(0, beta, gf.shape[0])
+    fig, ax = plt.subplots()
+    ax.grid()
+    ax.set_xlim(0, beta)
+    ax.set_xlabel(r"$\tau$")
+    ax.set_ylabel(r"$G(\tau)$")
+    for i, y in enumerate(gf.T):
+        ax.plot(tau, y, label="$G_{" + f"{i}, {i}" + "}$")
+    ax.legend()
+
+
+
+
+
+
+
+
+
 def main():
     # Model parameters
     n_sites = 5
