@@ -53,9 +53,5 @@ def print_filling(gf_up, gf_dn):
     print(f"<n>  = {np.mean(n_up + n_dn):.3f}")
 
 
-def local_gf(gf_tau, i):
-    return gf_tau[:, i, i]
-
-
 def density_of_states(gf_omega):
     return -gf_omega.imag / np.pi

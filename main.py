@@ -14,7 +14,7 @@ import time
 import logging
 import numpy as np
 import matplotlib.pyplot as plt
-from lqmc import HubbardModel, check_params, print_filling, local_gf
+from lqmc import HubbardModel, check_params
 from lqmc.lqmc import LatticeQMC
 from lqmc.muliprocessing import LqmcProcessManager
 
@@ -162,23 +162,19 @@ def plot_gf_tau(beta, gf):
 
 
 def main():
-    # Model parameters
     n_sites = 5
     u, t = 2, 1
     temp = 1
     beta = 1 / temp
-    # Simulation parameters
     sweeps = 100
     time_steps = 10
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
 
-    # g_tau = measure_multi_process(model, beta, time_steps, sweeps)
-    # save_gf_tau(model, beta, time_steps, g_tau)
-    g_tau = load_gf_tau(model, beta, time_steps)
-
-    g_tau_up, g_tau_dn = g_tau
+    g_tau = measure_multi_process(model, beta, time_steps, sweeps)
+    save_gf_tau(model, beta, time_steps, g_tau)
+    # g_tau = load_gf_tau(model, beta, time_steps)
     print()
 
     gf_up, gf_dn = get_local_gf_tau(g_tau)
