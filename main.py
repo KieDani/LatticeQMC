@@ -9,78 +9,14 @@ To do
 -----
 - Improve saving and loading
 """
-import os
 import time
-import logging
 import numpy as np
 import matplotlib.pyplot as plt
-from lqmc import HubbardModel, check_params
-from lqmc.lqmc import LatticeQMC
-from lqmc.muliprocessing import LqmcProcessManager
+from lqmc import HubbardModel, LatticeQMC, LqmcProcessManager
+from lqmc.tools import check_params, save_gf_tau, load_gf_tau
 
 
-# Configure basic logging for lqmc-loop
-# logging.basicConfig(filename="lqmc.log", filemode="w", format='%(message)s', level=logging.DEBUG)
-
-
-def save_gf_tau(model, beta, time_steps, gf):
-    """ Save time depended Green's function measurement data
-    into the tree
-    """
-    w, h = model.lattice.shape
-    folder = f"data\\u={model.u}_t={model.t}_mu={model.mu}_w={w}_h={h}"
-    if not os.path.isdir(folder):
-        os.makedirs(folder)
-    file = f"gf_t={beta}_nt={time_steps}.npy"
-    os.path.join(folder, file)
-    np.save(os.path.join(folder, file), gf)
-
-
-def load_gf_tau(model, beta, time_steps):
-    """ Load saved time depended Green's function measurement data
-
-    To Do
-    -----
-    Improve saving and loading
-    """
-    w, h = model.lattice.shape
-    folder = f"data\\u={model.u}_t={model.t}_mu={model.mu}_w={w}_h={h}"
-    file = f"gf_t={beta}_nt={time_steps}.npy"
-    return np.load(os.path.join(folder, file))
-
-
-def measure_single_process(model, beta, time_steps, sweeps, warmup_ratio=0.2):
-    t0 = time.time()
-
-    solver = LatticeQMC(model, beta, time_steps, sweeps, warmup_ratio)
-    print("Warmup:     ", solver.warm_sweeps)
-    print("Measurement:", solver.meas_sweeps)
-    check_params(model.u, model.t, solver.dtau)
-    solver.warmup_loop()
-    gf_tau = solver.measure_loop()
-
-    t = time.time() - t0
-    mins, secs = divmod(t, 60)
-    print(f"\nTotal time: {int(mins):0>2}:{int(secs):0>2} min")
-    print()
-    return gf_tau
-
-
-def measure_multi_process(model, beta, time_steps, sweeps, warmup_ratio=0.2):
-    manager = LqmcProcessManager()
-    manager.init(model, beta, time_steps, sweeps, warmup_ratio)
-
-    manager.start()
-    manager.run()
-    manager.join()
-    gf_data = manager.recv_all()
-    manager.terminate()
-
-    gf_tau = np.sum(gf_data, axis=0) / manager.cores
-    return gf_tau
-
-
-def measure(model, beta, time_steps, sweeps, warmup_ratio=0.2, mp=True):
+def measure(model, beta, time_steps, sweeps, warmup_ratio=0.2, cores=None):
     """ Runs the lqmc warmup and measurement loop for the given model.
 
     Parameters
@@ -95,25 +31,55 @@ def measure(model, beta, time_steps, sweeps, warmup_ratio=0.2, mp=True):
         Total number of sweeps (warmup + measurement)
     warmup_ratio: float, optional
         The ratio of sweeps used for warmup. The default is '0.2'.
-    mp: bool, optional
-        Flag if multiprocessing should be used. The default is True.
+    cores: int, optional
+        Number of processes to use. If not specified one process per core is used.
 
     Returns
     -------
-    gf: (2, N) np.ndarray
+    gf: (2, N, N) np.ndarray
         Measured Green's function .math'G' of the up- and down-spin channel.
     """
-    if mp:
-        gf_tau = measure_multi_process(model, beta, time_steps, sweeps, warmup_ratio)
+    check_params(model.u, model.t, beta / time_steps)
+    if cores is not None and cores == 1:
+        solver = LatticeQMC(model, beta, time_steps, sweeps, warmup_ratio)
+        print("Warmup:     ", solver.warm_sweeps)
+        print("Measurement:", solver.meas_sweeps)
+        t0 = time.time()
+        solver.warmup_loop()
+        gf_tau = solver.measure_loop()
+        t = time.time() - t0
+        mins, secs = divmod(t, 60)
+        print(f"\nTotal time: {int(mins):0>2}:{int(secs):0>2} min")
+        print()
     else:
-        gf_tau = measure_single_process(model, beta, time_steps, sweeps, warmup_ratio)
-
-    # Revert the time axis to be '[0, \beta]'
+        manager = LqmcProcessManager(cores)
+        manager.init(model, beta, time_steps, sweeps, warmup_ratio)
+        manager.start()
+        manager.run()
+        manager.join()
+        gf_data = manager.recv_all()
+        manager.terminate()
+        gf_tau = np.sum(gf_data, axis=0) / manager.cores
     return gf_tau
+
+
+def get_local_gf_tau(g_tau):
+    """ Returns the local elements (diagonal) of the Green's function matrix
+    Parameters
+    ----------
+    g_tau: (..., M, N, N) array_like
+        Green's function matrices for M time steps and N sites
+
+    Returns
+    -------
+    gf_tau: (..., M, N) np.ndarray
+    """
+    return np.diagonal(g_tau, axis1=-2, axis2=-1)
 
 
 def tau2iw_dft(gf_tau, beta):
     r""" Discrete Fourier transform of the real Green's function `gf_tau`.
+
     Parameters
     ----------
     gf_tau : (..., N_tau) float np.ndarray
@@ -134,31 +100,17 @@ def tau2iw_dft(gf_tau, beta):
     return gf_iw
 
 
-def get_local_gf_tau(g_tau):
-    """ Returns the local elements (diagonal) of the Green's function matrix
-    Parameters
-    ----------
-    g_tau: (...M, N, N) array_like
-        Green's function matrices for M time steps and N sites
-    Returns
-    -------
-    gf_tau: (..., M, N) np.ndarray
-    """
-    g_tau = g_tau[..., ::-1, :, :]
-    return np.diagonal(g_tau, axis1=-2, axis2=-1)
-
-
 def plot_gf_tau(beta, gf):
     tau = np.linspace(0, beta, gf.shape[0])
     fig, ax = plt.subplots()
     ax.grid()
-    ax.set_xlim(0, beta)
+    # ax.set_xlim(0, beta)
     ax.set_xlabel(r"$\tau$")
     ax.set_ylabel(r"$G(\tau)$")
     for i, y in enumerate(gf.T):
         ax.plot(tau, y, label="$G_{" + f"{i}, {i}" + "}$")
     ax.legend()
-
+    return fig, ax
 
 
 def main():
@@ -168,20 +120,22 @@ def main():
     temp = 2
     beta = 1 / temp
     # Simulation parameters
+    time_steps = 10
     sweeps = 1000
-    time_steps = 25
+    cores = 5
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
 
-    g_tau = measure(model, beta, time_steps, sweeps)
-    save_gf_tau(model, beta, time_steps, g_tau)
-    # g_tau = load_gf_tau(model, beta, time_steps)
+    try:
+        g_tau = load_gf_tau(model, beta, time_steps, sweeps)
+        print("GF data loaded")
+    except FileNotFoundError:
+        print("Found not data...")
+        g_tau = measure(model, beta, time_steps, sweeps, cores=cores)
+        save_gf_tau(model, beta, time_steps, sweeps, g_tau)
 
-    # Revert the time axis to be '[0, \beta]'
     gf_up, gf_dn = get_local_gf_tau(g_tau)
-
-    print(gf_up.shape)
     plot_gf_tau(beta, gf_up)
     plt.show()
 
