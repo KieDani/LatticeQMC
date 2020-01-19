@@ -46,7 +46,7 @@ class LatticeQMC:
         self.dtau = beta / time_steps
         self.time_steps = time_steps
         self.warm_sweeps = int(sweeps * warmup_ratio)
-        self.meas_sweeps = sweeps - self.warm_sweeps
+        self.meas_sweeps = sweeps  # sweeps - self.warm_sweeps
 
         self.n_sites = model.n_sites
         self.config = Configuration(self.n_sites, time_steps)

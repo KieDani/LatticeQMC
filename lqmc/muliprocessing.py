@@ -16,17 +16,20 @@ class LqmcProcess(LatticeQMC, multiprocessing.Process):
 
     INDEX = itertools.count()
 
-    def __init__(self, iters, pipe, model, beta, time_steps, sweeps=1000, warmup_ratio=0.2):
+    def __init__(self, i, iters, pipe, model, beta, time_steps, sweeps=1000, warmup_ratio=0.2):
         multiprocessing.Process.__init__(self)
         LatticeQMC.__init__(self, model, beta, time_steps, sweeps, warmup_ratio)
-        self.idx = next(LqmcProcess.INDEX)
+        self.lock = multiprocessing.Lock()
+        self.idx = i
         self.iters = iters
         self.pipe = pipe
 
     def loop_generator(self, sweeps):
         for sweep in range(sweeps):
             self.it += 1
+            self.lock.acquire()
             self.iters[self.idx] = self.it
+            self.lock.release()
             for i in range(self.model.n_sites):
                 for l in range(self.config.time_steps):
                     yield sweep, i, l
@@ -60,25 +63,32 @@ class LqmcProcessManager:
         self.cores = multiprocessing.cpu_count() if cores is None else cores
         self.iters = multiprocessing.Array("i", self.cores)
 
+    def processes_alive(self):
+        return [self.processes[i].is_alive() for i in range(self.cores)]
+
     def processes_done(self):
         return [self.iters[i] == self.sweeps[i] for i in range(self.cores)]
 
     def all_done(self):
-        return all(self.processes_done())
+        return all(self.processes_done()) or not any(self.processes_alive())
 
-    def init(self, model, beta, time_steps, sweeps, warmup_ratio=0.2):
+    def _init_processes(self, model, beta, time_steps, warmup_ratio=0.2):
         self.processes = list()
         self.pipes = list()
-        # sweeps = sweeps_per_core * self.cores
-        core_sweeps = np.full(self.cores, sweeps / self.cores, dtype="int")
-        core_sweeps[0] += sweeps - np.sum(core_sweeps)
-        self.sweeps = core_sweeps
-
         for i in range(self.cores):
             recv_end, send_end = multiprocessing.Pipe(False)
-            p = LqmcProcess(self.iters, send_end, model, beta, time_steps, core_sweeps[i], warmup_ratio)
+            p = LqmcProcess(i, self.iters, send_end, model, beta, time_steps, self.sweeps[i], warmup_ratio)
             self.processes.append(p)
             self.pipes.append(recv_end)
+
+    def init(self, model, beta, time_steps, sweeps, warmup_ratio=0.2):
+        self.sweeps = np.full(self.cores, sweeps / self.cores, dtype="int")
+        self.sweeps[0] += sweeps - np.sum(self.sweeps)
+        self._init_processes(model, beta, time_steps, warmup_ratio)
+
+    def init_per_core(self, model, beta, time_steps, sweeps_per_core, warmup_ratio=0.2):
+        self.sweeps = np.full(self.cores, sweeps_per_core, dtype="int")
+        self._init_processes(model, beta, time_steps, warmup_ratio)
 
     def start(self):
         # print(f"Running {self.total_sweeps()} Sweeps on {self.cores} processes ({self.sweeps})")
