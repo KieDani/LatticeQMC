@@ -34,6 +34,7 @@ class LqmcProcess(LatticeQMC, multiprocessing.Process):
     def run(self):
         # Set seed here to be sure pid is correct
         np.random.seed(self.pid)
+        self.config.initialize()
         # Run LQMC
         self.warmup_loop()
         gf = self.measure_loop()
