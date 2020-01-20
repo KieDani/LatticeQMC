@@ -70,15 +70,17 @@ def tau2iw_dft(gf_tau, beta):
     return gf_iw
 
 
-def measure_single_process(model, beta, time_steps, sweeps, warmup_ratio=0.2):
+def measure_single_process(model, beta, time_steps, sweeps, fast=True, warmup_ratio=0.2):
     t0 = time.time()
 
     solver = LatticeQMC(model, beta, time_steps, sweeps, warmup_ratio)
     print("Warmup:     ", solver.warm_sweeps)
     print("Measurement:", solver.meas_sweeps)
     check_params(model.u, model.t, solver.dtau)
-    solver.warmup_loop_det()
-    gf_tau = solver.measure_loop_det()
+    # solver.warmup_loop_det()
+    # gf_tau = solver.measure_loop_det()
+    solver.warmup_loop()
+    gf_tau = solver.measure_loop()
 
     t = time.time() - t0
     mins, secs = divmod(t, 60)
@@ -227,7 +229,11 @@ def main():
     print_filling(g_tau[0][7], g_tau[1][7])
 
     print('G_iw:')
-    print(tau2iw_dft(gf_up + gf_dn, beta))
+    g_iw = tau2iw_dft(gf_up + gf_dn, beta)
+    print(g_iw)
+
+    print('Im(G_iw)')
+    print(g_iw.imag)
 
 
 if __name__ == "__main__":
