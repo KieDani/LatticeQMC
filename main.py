@@ -205,7 +205,7 @@ def main():
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
 
-    g_tau = measure(model, beta, time_steps, sweeps)
+    g_tau = measure(model, beta, time_steps, sweeps, mp=False)
     save_gf_tau(model, beta, time_steps, g_tau)
     #g_tau = load_gf_tau(model, beta, time_steps)
 

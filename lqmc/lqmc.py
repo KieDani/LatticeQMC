@@ -146,7 +146,7 @@ def compute_gf_tau(config, ham_kin, g_beta, lamb, dtau, sigma):
         np.fill_diagonal(exp_min_v, (+1 * sigma * lamb * config[:, l-1]))
 
         b = np.dot(exp_k, exp_v)
-        #b_inv = np.linalg.inv(b)
+        # b_inv = np.linalg.inv(b)
         # fast and robust way of calculating b_inv
         b_inv = np.dot(exp_min_v, exp_min_k)
         g[l, :, :] = np.dot(np.dot(b_inv, g[l-1, :, :]), b)
