@@ -84,20 +84,18 @@ def compute_m(ham_kin, config, lamb, dtau, sigma):
     # check if there is a better way to calculate the matrix exponential
     exp_k = expm(dtau * ham_kin)
     # Create the V_l matrix
-    v = np.zeros((n, n), dtype=config.dtype)
+    exp_v = np.zeros((n, n), dtype=config.dtype)
 
     # fill diag(V_l) with values of last time slice and compute B-product
     lmax = config.time_steps - 1
 
-    np.fill_diagonal(v, config[:, lmax])
-    exp_v = expm(sigma * lamb * v)
+    np.fill_diagonal(exp_v, (sigma * lamb * config[:, lmax]))
     b = np.dot(exp_k, exp_v)
 
     b_prod = b
     for l in reversed(range(1, lmax)):
         # Fill V_l with new values, compute B(l) and multiply with total product
-        np.fill_diagonal(v, config[:, l])
-        exp_v = expm(sigma * lamb * v)
+        np.fill_diagonal(exp_v, (sigma * lamb * config[:, l]))
         b = np.dot(exp_k, exp_v)
         b_prod = np.dot(b_prod, b)
 
@@ -136,16 +134,16 @@ def compute_gf_tau(config, ham_kin, g_beta, lamb, dtau, sigma):
     exp_k = expm(dtau * ham_kin)
     exp_min_k = expm(-1 * dtau * ham_kin)
 
-    v = np.zeros((n, n), dtype=config.dtype)
+    exp_v = np.zeros((n, n), dtype=config.dtype)
+    exp_min_v = np.zeros((n, n), dtype=config.dtype)
 
     # g[0, :, :] is Greensfunction at time beta, g[1, :, :] is Greensfunction one step before, etc
     g = np.zeros((config.time_steps, n, n), dtype=np.float64)
     g[0, :, :] = g_beta
     for l in range(1, config.time_steps):
         # Create the V_l matrix
-        np.fill_diagonal(v, config[:, l])
-        exp_v = expm(sigma * lamb * v)
-        exp_min_v = expm(-1* sigma * lamb * v)
+        np.fill_diagonal(exp_v, (sigma * lamb * config[:, l]))
+        np.fill_diagonal(exp_min_v, (-1 * sigma * lamb * config[:, l]))
 
         b = np.dot(exp_k, exp_v)
         b_min = np.dot(exp_min_k, exp_min_v)
