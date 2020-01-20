@@ -141,13 +141,14 @@ def compute_gf_tau(config, ham_kin, g_beta, lamb, dtau, sigma):
     g = np.zeros((config.time_steps, n, n), dtype=np.float64)
     g[0, :, :] = g_beta
     for l in range(1, config.time_steps):
-        # Create the V_l matrix
-        np.fill_diagonal(exp_v, (-1 * sigma * lamb * config[:, l]))
-        np.fill_diagonal(exp_min_v, (+1 * sigma * lamb * config[:, l]))
+        # Always take config at the time slice before the aktual time slice
+        np.fill_diagonal(exp_v, (-1 * sigma * lamb * config[:, l-1]))
+        np.fill_diagonal(exp_min_v, (+1 * sigma * lamb * config[:, l-1]))
 
         b = np.dot(exp_k, exp_v)
         b_min = np.dot(exp_min_k, exp_min_v)
-        g[l, :, :] = np.dot(np.dot(b, g[l-1, :, :]), np.linalg.inv(b_min))
+        b_inv = np.linalg.inv(b)
+        g[l, :, :] = np.dot(np.dot(b_inv, g[l-1, :, :]), b)
     return g
 
 
