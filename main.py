@@ -77,8 +77,8 @@ def measure_single_process(model, beta, time_steps, sweeps, warmup_ratio=0.2):
     print("Warmup:     ", solver.warm_sweeps)
     print("Measurement:", solver.meas_sweeps)
     check_params(model.u, model.t, solver.dtau)
-    solver.warmup_loop()
-    gf_tau = solver.measure_loop()
+    solver.warmup_loop_det()
+    gf_tau = solver.measure_loop_det()
 
     t = time.time() - t0
     mins, secs = divmod(t, 60)
@@ -196,10 +196,10 @@ def main():
     # Model parameters
     n_sites = 5
     u, t = 2, 1
-    temp = 2
+    temp = 5
     beta = 1 / temp
     # Simulation parameters
-    sweeps = 600
+    sweeps = 1000
     time_steps = 10
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
