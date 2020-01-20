@@ -89,13 +89,13 @@ def compute_m(ham_kin, config, lamb, dtau, sigma):
     # fill diag(V_l) with values of last time slice and compute B-product
     lmax = config.time_steps - 1
 
-    np.fill_diagonal(exp_v, (-1 * sigma * lamb * config[:, lmax]))
+    np.fill_diagonal(exp_v, (np.exp(-1 * sigma * lamb * config[:, lmax])))
     b = np.dot(exp_k, exp_v)
 
     b_prod = b
     for l in reversed(range(0, lmax)):
         # Fill V_l with new values, compute B(l) and multiply with total product
-        np.fill_diagonal(exp_v, (-1 * sigma * lamb * config[:, l]))
+        np.fill_diagonal(exp_v, np.exp(-1 * sigma * lamb * config[:, l]))
         b = np.dot(exp_k, exp_v)
         b_prod = np.dot(b_prod, b)
 
@@ -132,7 +132,7 @@ def compute_gf_tau(config, ham_kin, g_beta, lamb, dtau, sigma):
     # Calculate the first matrix exp of B. This is a static value.
     # check if there is a better way to calculate the matrix exponential
     exp_k = expm(-1 * dtau * ham_kin)
-    exp_min_k = expm(1 * dtau * ham_kin)
+    exp_min_k = expm(+1 * dtau * ham_kin)
 
     exp_v = np.zeros((n, n), dtype=np.float64)
     exp_min_v = np.zeros((n, n), dtype=np.float64)
@@ -142,8 +142,8 @@ def compute_gf_tau(config, ham_kin, g_beta, lamb, dtau, sigma):
     g[0, :, :] = g_beta
     for l in range(1, config.time_steps):
         # Always take config at the time slice before the aktual time slice
-        np.fill_diagonal(exp_v, (-1 * sigma * lamb * config[:, l-1]))
-        np.fill_diagonal(exp_min_v, (1 * sigma * lamb * config[:, l-1]))
+        np.fill_diagonal(exp_v, np.exp(-1 * sigma * lamb * config[:, l-1]))
+        np.fill_diagonal(exp_min_v, np.exp(+1 * sigma * lamb * config[:, l-1]))
 
         b = np.dot(exp_k, exp_v)
         b_inv = np.linalg.inv(b)
