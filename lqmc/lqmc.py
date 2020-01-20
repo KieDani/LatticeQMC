@@ -93,7 +93,7 @@ def compute_m(ham_kin, config, lamb, dtau, sigma):
     b = np.dot(exp_k, exp_v)
 
     b_prod = b
-    for l in reversed(range(1, lmax)):
+    for l in reversed(range(0, lmax)):
         # Fill V_l with new values, compute B(l) and multiply with total product
         np.fill_diagonal(exp_v, (-1 * sigma * lamb * config[:, l]))
         b = np.dot(exp_k, exp_v)
