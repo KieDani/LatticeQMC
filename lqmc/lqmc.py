@@ -90,13 +90,13 @@ def compute_m(ham_kin, config, lamb, dtau, sigma):
     lmax = config.time_steps - 1
 
     np.fill_diagonal(exp_v, (np.exp(-1 * sigma * lamb * config[:, lmax])))
-    b = np.dot(exp_k, exp_v)
+    b = np.dot(exp_v, exp_k)
 
     b_prod = b
     for l in reversed(range(0, lmax)):
         # Fill V_l with new values, compute B(l) and multiply with total product
         np.fill_diagonal(exp_v, np.exp(-1 * sigma * lamb * config[:, l]))
-        b = np.dot(exp_k, exp_v)
+        b = np.dot(exp_v, exp_k)
         b_prod = np.dot(b_prod, b)
 
     # compute M matrix
@@ -145,7 +145,7 @@ def compute_gf_tau(config, ham_kin, g_beta, lamb, dtau, sigma):
         np.fill_diagonal(exp_v, np.exp(-1 * sigma * lamb * config[:, l-1]))
         np.fill_diagonal(exp_min_v, np.exp(+1 * sigma * lamb * config[:, l-1]))
 
-        b = np.dot(exp_k, exp_v)
+        b = np.dot(exp_v, exp_k)
         b_inv = np.linalg.inv(b)
         # fast and robust way of calculating b_inv
         # b_inv = np.dot(exp_min_v, exp_min_k)
