@@ -84,7 +84,7 @@ def compute_m(ham_kin, config, lamb, dtau, sigma):
     # check if there is a better way to calculate the matrix exponential
     exp_k = expm(-1 * dtau * ham_kin)
     # Create the V_l matrix
-    exp_v = np.zeros((n, n), dtype=config.dtype)
+    exp_v = np.zeros((n, n), dtype=np.float64)
 
     # fill diag(V_l) with values of last time slice and compute B-product
     lmax = config.time_steps - 1
@@ -134,8 +134,8 @@ def compute_gf_tau(config, ham_kin, g_beta, lamb, dtau, sigma):
     exp_k = expm(-1 * dtau * ham_kin)
     exp_min_k = expm(+1 * dtau * ham_kin)
 
-    exp_v = np.zeros((n, n), dtype=config.dtype)
-    exp_min_v = np.zeros((n, n), dtype=config.dtype)
+    exp_v = np.zeros((n, n), dtype=np.float64)
+    exp_min_v = np.zeros((n, n), dtype=np.float64)
 
     # g[0, :, :] is Greensfunction at time beta, g[1, :, :] is Greensfunction one step before, etc
     g = np.zeros((config.time_steps, n, n), dtype=np.float64)
