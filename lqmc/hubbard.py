@@ -17,8 +17,6 @@ class HubbardModel:
         self.t = t
         self.mu = mu if mu is not None else u/2  # Half filling if None
 
-        self.graph = None
-
     def param_str(self):
         return f"u={self.u}_t={self.t}_mu={self.mu}"
 
@@ -29,28 +27,23 @@ class HubbardModel:
     def n_sites(self):
         return self.lattice.n_sites
 
-    def build(self, width, height=1):
+    def build(self, width, height=1, cycling=True):
         self.lattice.build((width, height))
+        if cycling:
+            self.lattice.set_periodic_boundary()
 
-    def ham_kinetic(self, cycling=True):
-        n = self.lattice.n_sites
-
+    def ham_kinetic(self):
         # Create hamiltonian with diagonal elements
         energy = self.u/2 - self.mu
-        ham = energy * np.eye(n, dtype=np.float64)
-
+        ham = energy * np.eye(self.lattice.n_sites, dtype=np.float64)
         # Add hopping terms
         # i is the index of the current site. The lattice
         # returns the second index, j, which corresponds to
         # the nearest neighbors of the site:
         # H_ij = t, H_ji = t^*
-        for i in range(n):
+        for i in range(self.lattice.n_sites):
             for j in self.lattice.nearest_neighbours(i):
-                ham[i, j] = -self.t
-                ham[j, i] = -np.conj(self.t)
-
-        if cycling:
-            i, j = 0, -1
-            ham[i, j] = -self.t
-            ham[j, i] = np.conj(-self.t)
+                if i > j:
+                    ham[i, j] = -self.t
+                    ham[j, i] = -np.conj(self.t)
         return ham
