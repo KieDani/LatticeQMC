@@ -115,14 +115,14 @@ def plot_gf_tau(beta, gf):
 
 def main():
     # Model parameters
-    n_sites = 5
+    n_sites = 6
     u, t = 2, 1
     temp = 2
     beta = 1 / temp
     # Simulation parameters
-    time_steps = 12
-    warmup = 400
-    sweeps = 600
+    time_steps = 40
+    warmup = 1000
+    sweeps = 5000
     cores = 4  # None to use all cores of the cpu
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
@@ -157,6 +157,8 @@ def main():
 
     print('Im(G_iw)')
     print(g_iw.imag)
+    plt.plot(range(0,time_steps/2), g_iw.imag[:,0])
+    plt.show()
 
 
 if __name__ == "__main__":
