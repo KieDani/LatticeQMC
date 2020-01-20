@@ -16,7 +16,7 @@ from lqmc import HubbardModel, LatticeQMC, LqmcProcessManager
 from lqmc.tools import check_params, save_gf_tau, load_gf_tau
 
 
-def measure(model, beta, time_steps, sweeps, warmup_ratio=0.2, cores=None):
+def measure(model, beta, time_steps, warmup, sweeps, cores=None):
     """ Runs the lqmc warmup and measurement loop for the given model.
 
     Parameters
@@ -29,7 +29,7 @@ def measure(model, beta, time_steps, sweeps, warmup_ratio=0.2, cores=None):
         Number of time steps from .math'0' to .math'\beta'
     sweeps: int, optional
         Total number of sweeps (warmup + measurement)
-    warmup_ratio: float, optional
+    warmup int, optional
         The ratio of sweeps used for warmup. The default is '0.2'.
     cores: int, optional
         Number of processes to use. If not specified one process per core is used.
@@ -41,7 +41,7 @@ def measure(model, beta, time_steps, sweeps, warmup_ratio=0.2, cores=None):
     """
     check_params(model.u, model.t, beta / time_steps)
     if cores is not None and cores == 1:
-        solver = LatticeQMC(model, beta, time_steps, sweeps, warmup_ratio)
+        solver = LatticeQMC(model, beta, time_steps, warmup, sweeps)
         print("Warmup:     ", solver.warm_sweeps)
         print("Measurement:", solver.meas_sweeps)
         t0 = time.time()
@@ -53,11 +53,11 @@ def measure(model, beta, time_steps, sweeps, warmup_ratio=0.2, cores=None):
         print()
     else:
         manager = LqmcProcessManager(cores)
-        manager.init(model, beta, time_steps, sweeps, warmup_ratio)
+        manager.init(model, beta, time_steps, warmup, sweeps)
         manager.start()
         manager.run()
-        manager.join()
         gf_data = manager.recv_all()
+        manager.join()
         manager.terminate()
         gf_tau = np.sum(gf_data, axis=0) / manager.cores
     return gf_tau
@@ -121,6 +121,7 @@ def main():
     beta = 1 / temp
     # Simulation parameters
     time_steps = 25
+    warmup = 500
     sweeps = 10000
     cores = None  # None to use all cores of the cpu
 
@@ -132,8 +133,9 @@ def main():
         print("GF data loaded")
     except FileNotFoundError:
         print("Found no data...")
-        g_tau = measure(model, beta, time_steps, sweeps, cores=cores)
+        g_tau = measure(model, beta, time_steps, warmup, sweeps, cores=cores)
         save_gf_tau(model, beta, time_steps, sweeps, g_tau)
+        print("Saving")
 
     gf_up, gf_dn = get_local_gf_tau(g_tau)
     plot_gf_tau(beta, gf_up)

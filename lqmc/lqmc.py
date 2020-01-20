@@ -26,7 +26,7 @@ def expm(arg):
 
 class LatticeQMC:
 
-    def __init__(self, model, beta, time_steps, sweeps=1000, warmup_ratio=0.2):
+    def __init__(self, model, beta, time_steps, warmup=300, sweeps=2000):
         """ Initialize the Lattice Quantum Monte-Carlo solver.
 
         Parameters
@@ -36,17 +36,17 @@ class LatticeQMC:
         beta: float
             The inverse temperature .math'\beta = 1/T'.
         time_steps: int
-            Number of time steps from .math'0' to .math'\beta'
+            Number of time steps from .math'0' to .math'\beta'.
+        warmup int, optional
+            Number of warmup sweeps.
         sweeps: int, optional
-            Total number of sweeps (warmup + measurement)
-        warmup_ratio: float, optional
-            The ratio of sweeps used for warmup. The default is '0.2'.
+            Number of measurement sweeps.
         """
         self.model = model
         self.dtau = beta / time_steps
         self.time_steps = time_steps
-        self.warm_sweeps = int(sweeps * warmup_ratio)
-        self.meas_sweeps = sweeps  # sweeps - self.warm_sweeps
+        self.warm_sweeps = warmup
+        self.meas_sweeps = sweeps
 
         self.n_sites = model.n_sites
         self.config = Configuration(self.n_sites, time_steps)
