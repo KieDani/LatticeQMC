@@ -132,7 +132,7 @@ def compute_gf_tau(config, ham_kin, g_beta, lamb, dtau, sigma):
     # Calculate the first matrix exp of B. This is a static value.
     # check if there is a better way to calculate the matrix exponential
     exp_k = expm(-1 * dtau * ham_kin)
-    exp_min_k = expm(+1 * dtau * ham_kin)
+    exp_min_k = expm(1 * dtau * ham_kin)
 
     exp_v = np.zeros((n, n), dtype=np.float64)
     exp_min_v = np.zeros((n, n), dtype=np.float64)
@@ -143,12 +143,12 @@ def compute_gf_tau(config, ham_kin, g_beta, lamb, dtau, sigma):
     for l in range(1, config.time_steps):
         # Always take config at the time slice before the aktual time slice
         np.fill_diagonal(exp_v, (-1 * sigma * lamb * config[:, l-1]))
-        np.fill_diagonal(exp_min_v, (+1 * sigma * lamb * config[:, l-1]))
+        np.fill_diagonal(exp_min_v, (1 * sigma * lamb * config[:, l-1]))
 
         b = np.dot(exp_k, exp_v)
-        # b_inv = np.linalg.inv(b)
+        b_inv = np.linalg.inv(b)
         # fast and robust way of calculating b_inv
-        b_inv = np.dot(exp_min_v, exp_min_k)
+        # b_inv = np.dot(exp_min_v, exp_min_k)
         g[l, :, :] = np.dot(np.dot(b_inv, g[l-1, :, :]), b)
     return g
 
