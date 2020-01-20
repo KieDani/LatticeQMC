@@ -196,10 +196,10 @@ def main():
     # Model parameters
     n_sites = 5
     u, t = 2, 1
-    temp = 5
+    temp = 2
     beta = 1 / temp
     # Simulation parameters
-    sweeps = 1000
+    sweeps = 600
     time_steps = 10
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
@@ -215,6 +215,19 @@ def main():
     print(gf_up.shape)
     plot_gf_tau(beta, gf_up)
     plt.show()
+    plot_gf_tau(beta, gf_dn)
+    plt.show()
+    plot_gf_tau(beta, gf_up + gf_dn)
+    plt.show()
+
+    #print(g_tau[0])
+    print('fillings:')
+    print_filling(g_tau[0][0], g_tau[1][0])
+    print_filling(g_tau[0][5], g_tau[1][5])
+    print_filling(g_tau[0][7], g_tau[1][7])
+
+    print('G_iw:')
+    print(tau2iw_dft(gf_up + gf_dn, beta))
 
 
 if __name__ == "__main__":
