@@ -200,7 +200,7 @@ def main():
     beta = 1 / temp
     # Simulation parameters
     sweeps = 1000
-    time_steps = 25
+    time_steps = 15
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
