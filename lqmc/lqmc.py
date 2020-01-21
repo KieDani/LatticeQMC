@@ -4,12 +4,8 @@ Created on 15 Jan 2020
 
 project: LatticeQMC
 version: 1.0
-
-To Do
------
-- Green's function time slices
-- Efficiency
 """
+import time
 import logging
 import itertools
 import numpy as np
@@ -17,11 +13,9 @@ from scipy.linalg import expm
 from lqmc import HubbardModel, Configuration
 
 
-
-
 class LatticeQMC:
 
-    def __init__(self, model, beta, time_steps, warmup=300, sweeps=2000):
+    def __init__(self, model, beta, time_steps, warmup=300, sweeps=2000, det_mode=False):
         """ Initialize the Lattice Quantum Monte-Carlo solver.
 
         Parameters
@@ -36,6 +30,9 @@ class LatticeQMC:
             Number of warmup sweeps.
         sweeps: int, optional
             Number of measurement sweeps.
+        det_mode: bool, optional
+            Flag for the calculation mode. If 'True' the slow algorithm via
+            the determinants is used. The default i9s 'False' (faster).
         """
         self.model = model
         self.dtau = beta / time_steps
@@ -46,14 +43,16 @@ class LatticeQMC:
         self.n_sites = model.n_sites
         self.config = Configuration(self.n_sites, time_steps)
 
-        # Cachd variables
-        self.ham_kin = self.model.ham_kinetic()
-        self.lamb = np.arccosh(np.exp(self.model.u * self.dtau / 2.))
-        self.exp_k = expm(-1 * self.dtau * self.ham_kin)
-        self.v = np.zeros((self.n_sites, self.n_sites), dtype=self.config.dtype)
-        self.exp_v = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
+        self.det_mode = det_mode
         self.status = ""
         self.it = 0
+
+        # Cachwd variables
+        self.ham_kin = self.model.ham_kinetic()
+        self.lamb = np.arccosh(np.exp(self.model.u * self.dtau / 2.)) if self.model.u else 1
+        self.exp_k = expm(-1 * self.dtau * self.ham_kin)
+        self.exp_v = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
+        # self.v = np.zeros((self.n_sites, self.n_sites), dtype=self.config.dtype)
 
     def log_iterstep(self, sweep, i, l, ratio, acc):
         logging.debug(f"{self.status} {sweep} i={i}, l={l} - ratio={ratio:.3f}, accepted={acc}")
@@ -100,7 +99,6 @@ class LatticeQMC:
         exp_v: (N, N) np.ndarray
         """
         np.fill_diagonal(self.exp_v, np.exp(-1 * sigma * self.lamb * self.config[:, l]))
-        #np.fill_diagonal(self.v, self.config[:, l])
         return self.exp_v
 
     def _m(self, sigma):
@@ -135,7 +133,6 @@ class LatticeQMC:
         g[0, :, :] = g_beta
         for l in range(1, self.time_steps):
             exp_v = self._exp_v(l, sigma)
-
             b = np.dot(exp_v, self.exp_k)
             b_inv = np.linalg.inv(b)
             # fast and robust way of calculating b_inv
@@ -312,3 +309,23 @@ class LatticeQMC:
             number += 1
         # Return the normalized gfs for each spin
         return np.array([gf_up, gf_dn]) / number
+
+    def run_lqmc(self):
+        if self.det_mode:
+            self.warmup_loop_det()
+            gf = self.measure_loop_det()
+        else:
+            self.warmup_loop()
+            gf = self.measure_loop()
+        return gf
+
+    def run(self):
+        print("Warmup:     ", self.warm_sweeps)
+        print("Measurement:", self.meas_sweeps)
+        t0 = time.time()
+        gf_tau = self.run_lqmc()
+        t = time.time() - t0
+        mins, secs = divmod(t, 60)
+        print(f"\nTotal time: {int(mins):0>2}:{int(secs):0>2} min")
+        print()
+        return gf_tau
