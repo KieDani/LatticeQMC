@@ -45,8 +45,7 @@ def measure(model, beta, time_steps, warmup, sweeps, cores=None):
         print("Warmup:     ", solver.warm_sweeps)
         print("Measurement:", solver.meas_sweeps)
         t0 = time.time()
-        solver.warmup_loop()
-        gf_tau = solver.measure_loop()
+        gf_tau = solver.run_lqmc()
         t = time.time() - t0
         mins, secs = divmod(t, 60)
         print(f"\nTotal time: {int(mins):0>2}:{int(secs):0>2} min")
@@ -115,15 +114,15 @@ def plot_gf_tau(beta, gf):
 
 def main():
     # Model parameters
-    n_sites = 5
-    u, t = 2, 1
+    n_sites = 10
+    u, t = 0, 1
     temp = 2
     beta = 1 / temp
     # Simulation parameters
-    time_steps = 12
-    warmup = 400
-    sweeps = 600
-    cores = 4  # None to use all cores of the cpu
+    time_steps = 25
+    warmup = 500
+    sweeps = 5000
+    cores = 5  # None to use all cores of the cpu
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
@@ -138,25 +137,24 @@ def main():
         print("Saving")
 
     gf_up, gf_dn = get_local_gf_tau(g_tau)
-    plot_gf_tau(beta, gf_up)
-    plt.show()
-    plot_gf_tau(beta, gf_dn)
-    plt.show()
-    plot_gf_tau(beta, gf_up + gf_dn)
-    plt.show()
+    gf_omega_up = tau2iw_dft(gf_up, beta)
+    gf_omega_dn = tau2iw_dft(gf_dn, beta)
 
-    #print(g_tau[0])
+    plot_gf_tau(beta, gf_up)
+    plot_gf_tau(beta, gf_dn)
+    plot_gf_tau(beta, gf_up + gf_dn)
+
     print('fillings:')
     print_filling(g_tau[0][0], g_tau[1][0])
     print_filling(g_tau[0][5], g_tau[1][5])
     print_filling(g_tau[0][7], g_tau[1][7])
-
     print('G_iw:')
     g_iw = tau2iw_dft(gf_up + gf_dn, beta)
     print(g_iw)
-
     print('Im(G_iw)')
     print(g_iw.imag)
+
+    plt.show()
 
 
 if __name__ == "__main__":
