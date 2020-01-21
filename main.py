@@ -12,54 +12,8 @@ To do
 import time
 import numpy as np
 import matplotlib.pyplot as plt
-from lqmc import HubbardModel, LatticeQMC, LqmcProcessManager
+from lqmc import HubbardModel, measure
 from lqmc.tools import check_params, save_gf_tau, load_gf_tau, print_filling
-
-
-def measure(model, beta, time_steps, warmup, sweeps, cores=None):
-    """ Runs the lqmc warmup and measurement loop for the given model.
-
-    Parameters
-    ----------
-    model: HubbardModel
-        The Hubbard model instance.
-    beta: float
-        The inverse temperature .math'\beta = 1/T'.
-    time_steps: int
-        Number of time steps from .math'0' to .math'\beta'
-    sweeps: int, optional
-        Total number of sweeps (warmup + measurement)
-    warmup int, optional
-        The ratio of sweeps used for warmup. The default is '0.2'.
-    cores: int, optional
-        Number of processes to use. If not specified one process per core is used.
-
-    Returns
-    -------
-    gf: (2, N, N) np.ndarray
-        Measured Green's function .math'G' of the up- and down-spin channel.
-    """
-    check_params(model.u, model.t, beta / time_steps)
-    if cores is not None and cores == 1:
-        solver = LatticeQMC(model, beta, time_steps, warmup, sweeps)
-        print("Warmup:     ", solver.warm_sweeps)
-        print("Measurement:", solver.meas_sweeps)
-        t0 = time.time()
-        gf_tau = solver.run_lqmc()
-        t = time.time() - t0
-        mins, secs = divmod(t, 60)
-        print(f"\nTotal time: {int(mins):0>2}:{int(secs):0>2} min")
-        print()
-    else:
-        manager = LqmcProcessManager(cores)
-        manager.init(model, beta, time_steps, warmup, sweeps)
-        manager.start()
-        manager.run()
-        gf_data = manager.recv_all()
-        manager.join()
-        manager.terminate()
-        gf_tau = np.sum(gf_data, axis=0) / manager.cores
-    return gf_tau
 
 
 def get_local_gf_tau(g_tau):
@@ -115,13 +69,13 @@ def plot_gf_tau(beta, gf):
 def main():
     # Model parameters
     n_sites = 4
-    u, t = 2, 1
-    temp = 2
+    u, t = 5, 1
+    temp = 5
     beta = 1 / temp
     # Simulation parameters
-    time_steps = 10
-    warmup = 100
-    sweeps = 300
+    time_steps = 25
+    warmup = 1000
+    sweeps = 1000
     cores = 1  # None to use all cores of the cpu
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
@@ -132,8 +86,8 @@ def main():
         print("GF data loaded")
     except FileNotFoundError:
         print("Found no data...")
-        g_tau = measure(model, beta, time_steps, warmup, sweeps, cores=cores)
-        save_gf_tau(model, beta, time_steps, sweeps, g_tau)
+        g_tau = measure(model, beta, time_steps, warmup, sweeps, cores=cores, det_mode=True)
+        #save_gf_tau(model, beta, time_steps, sweeps, g_tau)
         print("Saving")
 
     gf_up, gf_dn = get_local_gf_tau(g_tau)
@@ -153,8 +107,8 @@ def main():
     print(g_iw)
     print('Im(G_iw)')
     print(g_iw.imag)
-    plt.plot(range(0,time_steps/2), g_iw.imag[:,0])
     plt.show()
+    plt.plot(range(0,int(time_steps/2)), g_iw.imag[:,0])
 
     plt.show()
 
