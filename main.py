@@ -114,7 +114,6 @@ def plot_gf_tau(beta, gf):
 
 def main():
     # Model parameters
-<<<<<<< HEAD
     n_sites = 4
     u, t = 2, 1
     temp = 2
@@ -124,17 +123,6 @@ def main():
     warmup = 100
     sweeps = 300
     cores = 1  # None to use all cores of the cpu
-=======
-    n_sites = 10
-    u, t = 0, 1
-    temp = 2
-    beta = 1 / temp
-    # Simulation parameters
-    time_steps = 25
-    warmup = 500
-    sweeps = 5000
-    cores = 5  # None to use all cores of the cpu
->>>>>>> master
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
