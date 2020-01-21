@@ -115,15 +115,15 @@ def plot_gf_tau(beta, gf):
 
 def main():
     # Model parameters
-    n_sites = 6
+    n_sites = 4
     u, t = 2, 1
     temp = 2
     beta = 1 / temp
     # Simulation parameters
-    time_steps = 40
-    warmup = 1000
-    sweeps = 5000
-    cores = 4  # None to use all cores of the cpu
+    time_steps = 10
+    warmup = 100
+    sweeps = 300
+    cores = 1  # None to use all cores of the cpu
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
@@ -149,7 +149,7 @@ def main():
     print('fillings:')
     print_filling(g_tau[0][0], g_tau[1][0])
     print_filling(g_tau[0][5], g_tau[1][5])
-    print_filling(g_tau[0][7], g_tau[1][7])
+    print_filling(g_tau[0][time_steps-1], g_tau[1][time_steps-1])
 
     print('G_iw:')
     g_iw = tau2iw_dft(gf_up + gf_dn, beta)
