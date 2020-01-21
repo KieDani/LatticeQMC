@@ -76,5 +76,70 @@ def print_filling(gf_up, gf_dn):
     print(f"<n>  = {np.mean(n_up + n_dn):.3f}")
 
 
-def density_of_states(gf_omega):
-    return -gf_omega.imag / np.pi
+def local_gf(gf):
+    """ Returns the local elements (diagonal) of the Green's function matrix
+
+    Parameters
+    ----------
+    gf: (..., N, N) array_like
+        Green's function matrice
+
+    Returns
+    -------
+    gf_loc: (..., N) np.ndarray
+    """
+    return np.diagonal(gf, axis1=-2, axis2=-1)
+
+
+def matsubara_frequencies(points, beta):
+    """ Returns the fermionic Matsubara frequencies :math:'iω_n' for the points 'points'.
+
+    Parameters
+    ----------
+    points: array_like
+        Points for which the Matsubara frequencies :math:`iω_n` are returned.
+    beta: float
+        The inverse temperature :math:'beta = 1/k_B T'.
+
+    Returns
+    -------
+    matsubara_frequencies: complex ndarray
+    """
+    n_points = np.asanyarray(points).astype(dtype=int, casting='safe')
+    return 1j * np.pi / beta * (2 * n_points + 1)
+
+
+def fermi_fct(eps, beta):
+    r"""Return the Fermi function `1/(exp(βϵ)+1)`.
+
+    For complex inputs the function is not as accurate as for real inputs.
+
+    Parameters
+    ----------
+    eps : complex or float or ndarray
+        The energy at which the Fermi function is evaluated.
+    beta : float
+        The inverse temperature :math:`beta = 1/k_B T`.
+
+    Returns
+    -------
+    fermi_fct : complex of float or ndarray
+        The Fermi function, same type as eps.
+
+    See Also
+    --------
+    fermi_fct_inv : The inverse of the Fermi function for real arguments
+
+    """
+    z = eps*beta
+    try:
+        return 0.5 * (1. + np.tanh(-0.5 * beta * eps))
+    except TypeError:
+        pass  # complex arguments not handled by expit
+    z = np.asanyarray(z)
+    pos = z.real > 0
+    res = np.empty_like(z)
+    res[~pos] = 1./(np.exp(z[~pos]) + 1)
+    exp_m = np.exp(-z[pos])
+    res[pos] = exp_m/(1 + exp_m)
+    return res
