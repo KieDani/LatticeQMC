@@ -16,9 +16,9 @@ class LqmcProcess(LatticeQMC, multiprocessing.Process):
 
     INDEX = itertools.count()
 
-    def __init__(self, i, iters, pipe, model, beta, time_steps,  warm_sweeps=300, meas_sweeps=2000):
+    def __init__(self, i, iters, pipe, *args, **kwargs):
         multiprocessing.Process.__init__(self)
-        LatticeQMC.__init__(self, model, beta, time_steps,  warm_sweeps, meas_sweeps)
+        LatticeQMC.__init__(self, *args, **kwargs)
         self.lock = multiprocessing.Lock()
         self.idx = i
         self.iters = iters
@@ -39,8 +39,7 @@ class LqmcProcess(LatticeQMC, multiprocessing.Process):
         np.random.seed(self.pid)
         self.config.initialize()
         # Run LQMC
-        self.warmup_loop()
-        gf = self.measure_loop()
+        gf = self.run_lqmc()
         # Send results to main thread
         self.pipe.send(gf)
 
@@ -49,8 +48,22 @@ class LqmcProcessManager:
 
     CORE_COUNT = multiprocessing.cpu_count()
 
-    def __init__(self, cores=None):
-        self.cores = multiprocessing.cpu_count() if cores is None else cores
+    def __init__(self, processes=None):
+        """ Initialize process manager for lqmc multiprocessing
+
+        Parameters
+        ----------
+        processes: int, optional
+            Number of processes to use. If value is 'None' or '0' the number of  cores of the system-cpu is used.
+            If the value is negative it will be subtracted from the core number.
+        """
+        if processes is None:
+            n_procs = multiprocessing.cpu_count()
+        elif processes < 0:
+            n_procs = multiprocessing.cpu_count() + processes
+        else:
+            n_procs = processes
+        self.cores = n_procs
         self.iters = multiprocessing.Array("i", self.cores)
         self.processes = list()
         self.pipes = list()
@@ -73,7 +86,7 @@ class LqmcProcessManager:
     def all_done(self):
         return all(self.processes_done()) or not any(self.processes_alive())
 
-    def init(self, model, beta, time_steps,  warm_sweeps=300, meas_sweeps=2000):
+    def init(self, model, beta, time_steps,  warm_sweeps=300, meas_sweeps=2000, det_mode=False):
         self.warm_sweeps = warm_sweeps
         self.measure_sweeps = np.full(self.cores, meas_sweeps / self.cores, dtype="int")
         self.measure_sweeps[0] += meas_sweeps - np.sum(self.measure_sweeps)
@@ -81,7 +94,8 @@ class LqmcProcessManager:
         self.pipes = list()
         for i in range(self.cores):
             recv_end, send_end = multiprocessing.Pipe(False)
-            p = LqmcProcess(i, self.iters, send_end, model, beta, time_steps, self.warm_sweeps, self.measure_sweeps[i])
+            meas_sweeps = self.measure_sweeps[i]
+            p = LqmcProcess(i, self.iters, send_end, model, beta, time_steps, self.warm_sweeps, meas_sweeps, det_mode)
             self.processes.append(p)
             self.pipes.append(recv_end)
 
