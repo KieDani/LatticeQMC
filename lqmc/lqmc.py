@@ -49,8 +49,8 @@ class LatticeQMC:
 
         # Cachwd variables
         self.ham_kin = self.model.ham_kinetic()
-        self.lamb = np.arccosh(np.exp(self.model.u * self.dtau / 2.)) if self.model.u else 1
-        self.exp_k = expm(-1 * self.dtau * self.ham_kin)
+        self.lamb = np.arccosh(np.exp(self.model.u * self.dtau / 2.)) if self.model.u else 0
+        self.exp_k = expm(+1 * self.dtau * self.ham_kin)
         self.exp_v = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
         # self.v = np.zeros((self.n_sites, self.n_sites), dtype=self.config.dtype)
 
@@ -98,7 +98,7 @@ class LatticeQMC:
         -------
         exp_v: (N, N) np.ndarray
         """
-        np.fill_diagonal(self.exp_v, np.exp(-1 * sigma * self.lamb * self.config[:, l]))
+        np.fill_diagonal(self.exp_v, np.exp(+1 * sigma * self.lamb * self.config[:, l]))
         return self.exp_v
 
     def _m(self, sigma):
@@ -111,10 +111,12 @@ class LatticeQMC:
         lmax = self.config.time_steps - 1
         # compute prod(B)
         exp_v = self._exp_v(lmax, sigma)
-        b = np.dot(exp_v, self.exp_k)
+        #b = np.dot(exp_v, self.exp_k)
+        b = np.dot(self.exp_k, exp_v)
         b_prod = b
         for l in reversed(range(0, lmax)):
             exp_v = self._exp_v(l, sigma)
+            #b = np.dot(self.exp_k, exp_v)
             b = np.dot(self.exp_k, exp_v)
             b_prod = np.dot(b_prod, b)
         # compute M matrix
@@ -133,7 +135,8 @@ class LatticeQMC:
         g[0, :, :] = g_beta
         for l in range(1, self.time_steps):
             exp_v = self._exp_v(l, sigma)
-            b = np.dot(exp_v, self.exp_k)
+            #b = np.dot(exp_v, self.exp_k)
+            b = np.dot(self.exp_k, exp_v)
             b_inv = np.linalg.inv(b)
             # fast and robust way of calculating b_inv
             # b_inv = np.dot(exp_min_k, exp_min_v)
