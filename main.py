@@ -88,7 +88,7 @@ def main():
         print("GF data loaded")
     except FileNotFoundError:
         print("Found no data...")
-        g_tau = measure(model, beta, time_steps, warmup, sweeps, cores=cores, det_mode=True)
+        g_tau = measure(model, beta, time_steps, warmup, sweeps, cores=cores, det_mode=False)
         #save_gf_tau(model, beta, time_steps, sweeps, g_tau)
         print("Saving")
 
@@ -99,6 +99,7 @@ def main():
     plot_gf_tau(beta, gf_up)
     plot_gf_tau(beta, gf_dn)
     plot_gf_tau(beta, gf_up + gf_dn)
+    plt.show()
 
     print('fillings:')
     print(g_tau)

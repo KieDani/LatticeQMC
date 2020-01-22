@@ -102,10 +102,10 @@ class LatticeQMC:
         exp_v: (N, N) np.ndarray
         """
         if minus:
-            np.fill_diagonal(self.exp_min_v, np.exp(-1 * sigma * self.lamb * self.config[:, l]))
+            np.fill_diagonal(self.exp_min_v, np.exp(1 * sigma * self.lamb * self.config[:, l]))
             return self.exp_min_v
         else:
-            np.fill_diagonal(self.exp_v, np.exp(+1 * sigma * self.lamb * self.config[:, l]))
+            np.fill_diagonal(self.exp_v, np.exp(-1 * sigma * self.lamb * self.config[:, l]))
             return self.exp_v
 
 
@@ -233,18 +233,6 @@ class LatticeQMC:
                 self.config = old_config
 
     def measure_loop_det(self):
-        def plot_gf_tau(beta, gf):
-            tau = np.linspace(0, beta, gf.shape[0])
-            fig, ax = plt.subplots()
-            ax.set_ylim(-2, 2)
-            ax.grid()
-            # ax.set_xlim(0, beta)
-            ax.set_xlabel(r"$\tau$")
-            ax.set_ylabel(r"$G(\tau)$")
-            for i, y in enumerate(gf.T):
-                ax.plot(tau, y, label="$G_{" + f"{i}, {i}" + "}$")
-            ax.legend()
-            return fig, ax
         r""" Runs the slow version of the LQMC measurement-loop and returns the Green's function.
 
         Returns
