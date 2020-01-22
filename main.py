@@ -56,6 +56,7 @@ def tau2iw_dft(gf_tau, beta):
 def plot_gf_tau(beta, gf):
     tau = np.linspace(0, beta, gf.shape[0])
     fig, ax = plt.subplots()
+    ax.set_ylim(-2, 2)
     ax.grid()
     # ax.set_xlim(0, beta)
     ax.set_xlabel(r"$\tau$")
@@ -68,18 +69,19 @@ def plot_gf_tau(beta, gf):
 
 def main():
     # Model parameters
-    n_sites = 4
-    u, t = 5, 1
-    temp = 5
+    n_sites = 3
+    u, t = 4, 1
+    temp = 4.
     beta = 1 / temp
     # Simulation parameters
-    time_steps = 25
-    warmup = 1000
-    sweeps = 1000
+    time_steps = 15
+    warmup = 200
+    sweeps = 200
     cores = 1  # None to use all cores of the cpu
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
-    model.build(n_sites)
+    model.build(n_sites, cycling=False)
+    print(model.ham_kinetic())
 
     try:
         g_tau = load_gf_tau(model, beta, time_steps, sweeps)
@@ -91,14 +93,15 @@ def main():
         print("Saving")
 
     gf_up, gf_dn = get_local_gf_tau(g_tau)
-    gf_omega_up = tau2iw_dft(gf_up, beta)
-    gf_omega_dn = tau2iw_dft(gf_dn, beta)
+    #gf_omega_up = tau2iw_dft(gf_up, beta)
+    #gf_omega_dn = tau2iw_dft(gf_dn, beta)
 
     plot_gf_tau(beta, gf_up)
     plot_gf_tau(beta, gf_dn)
     plot_gf_tau(beta, gf_up + gf_dn)
 
     print('fillings:')
+    print(g_tau)
     print_filling(g_tau[0][0], g_tau[1][0])
     print_filling(g_tau[0][5], g_tau[1][5])
     print_filling(g_tau[0][time_steps-1], g_tau[1][time_steps-1])
@@ -107,7 +110,6 @@ def main():
     print(g_iw)
     print('Im(G_iw)')
     print(g_iw.imag)
-    plt.show()
     plt.plot(range(0,int(time_steps/2)), g_iw.imag[:,0])
 
     plt.show()

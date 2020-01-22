@@ -11,6 +11,7 @@ import itertools
 import numpy as np
 from scipy.linalg import expm
 from lqmc import HubbardModel, Configuration
+import matplotlib.pyplot as plt
 
 
 class LatticeQMC:
@@ -50,8 +51,8 @@ class LatticeQMC:
         # Cachwd variables
         self.ham_kin = self.model.ham_kinetic()
         self.lamb = np.arccosh(np.exp(self.model.u * self.dtau / 2.)) if self.model.u else 0
-        self.exp_k = expm(-1 * self.dtau * self.ham_kin)
-        self.exp_min_k = expm(+1 * self.dtau * self.ham_kin)
+        self.exp_k = expm(1 * self.dtau * self.ham_kin)
+        self.exp_min_k = expm(-1 * self.dtau * self.ham_kin)
         self.exp_v = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
         self.exp_min_v = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
         # self.v = np.zeros((self.n_sites, self.n_sites), dtype=self.config.dtype)
@@ -77,9 +78,9 @@ class LatticeQMC:
         """
         for sweep in range(sweeps):
             self.it = sweep
-            for i, l in itertools.product(range(self.model.n_sites), range(self.config.time_steps)):
+            for l, i in itertools.product(range(self.config.time_steps), range(self.model.n_sites)):
                 print(f"\r{self.status} Sweep {sweep} [{i}, {l}]", end="", flush=True)
-                yield sweep, i, l
+                yield sweep, l, i
 
     def _exp_v(self, l, sigma, minus = False):
         r""" Computes the Matrix exponential of 'V_\sigma(l)'
@@ -100,12 +101,20 @@ class LatticeQMC:
         -------
         exp_v: (N, N) np.ndarray
         """
-        if(minus == True):
+        if minus:
             np.fill_diagonal(self.exp_min_v, np.exp(-1 * sigma * self.lamb * self.config[:, l]))
             return self.exp_min_v
         else:
             np.fill_diagonal(self.exp_v, np.exp(+1 * sigma * self.lamb * self.config[:, l]))
             return self.exp_v
+
+
+    def _b(self, exp_v, inv=False):
+        if inv:
+            return np.dot(self.exp_min_k, exp_v)
+        else:
+            return np.dot(exp_v, self.exp_k)
+
 
     def _m(self, sigma):
         r""" Computes the 'M' matrices for spin '\sigma'
@@ -123,10 +132,11 @@ class LatticeQMC:
         for l in reversed(range(0, lmax)):
             exp_v = self._exp_v(l, sigma)
             #b = np.dot(self.exp_k, exp_v)
-            b = np.dot(self.exp_k, exp_v)
+            b = self._b(exp_v)
             b_prod = np.dot(b_prod, b)
         # compute M matrix
         return np.eye(self.n_sites) + b_prod
+
 
     def _gf_tau(self, g_beta, sigma):
         """ Computes the Green's function for all time slices recursively.
@@ -140,16 +150,36 @@ class LatticeQMC:
         g = np.zeros((self.time_steps, self.n_sites, self.n_sites), dtype=np.float64)
         g[0, :, :] = g_beta
         for l in range(1, self.time_steps):
-            exp_v = self._exp_v(l, sigma)
+            exp_v = self._exp_v(l-1, sigma)
             exp_min_v = self._exp_v(l, sigma, minus=True)
-            #b = np.dot(exp_v, self.exp_k)
-            b = np.dot(self.exp_k, exp_v)
-            b_inv = np.dot(exp_min_v, self.exp_min_k)
-            #b_inv = np.linalg.inv(b)
-            # fast and robust way of calculating b_inv
-            # b_inv = np.dot(exp_min_k, exp_min_v)
+            b = self._b(exp_v)
+            b_inv = self._b(exp_v=exp_min_v, inv=True)
             g[l, ...] = np.dot(np.dot(b_inv, g[l - 1, ...]), b)
         return g[::-1]
+
+    # def _gf_tau(self, g_beta, sigma):
+    #     #print('start')
+    #     g = np.zeros((self.time_steps, self.n_sites, self.n_sites), dtype=np.float64)
+    #     g[0, :, :] = g_beta
+    #     for l in range(1, self.time_steps):
+    #         #calculate g[l, ...]
+    #         lmax = self.config.time_steps - 1 - l
+    #         # compute prod(B)
+    #         exp_v = self._exp_v(lmax, sigma)
+    #         # b = np.dot(exp_v, self.exp_k)
+    #         b = np.dot(self.exp_k, exp_v)
+    #         b_prod = b
+    #         for l2 in reversed(range(0, lmax)):
+    #             exp_v = self._exp_v(l, sigma)
+    #             # b = np.dot(self.exp_k, exp_v)
+    #             b = self._b(exp_v)
+    #             b_prod = np.dot(b_prod, b)
+    #             #print()
+    #         g[l, :, :] = np.linalg.inv(np.eye(self.n_sites) + b_prod)
+    #         #print(g[l,...])
+    #     return g[::-1]
+
+
 
     def _compute_m(self):
         """ Computes the 'M' matrices for both spins.
@@ -186,7 +216,7 @@ class LatticeQMC:
         old = np.linalg.det(m_up) * np.linalg.det(m_dn)
         old_config = self.config.copy()  # Store copy of current configuration
         # QMC loop
-        for sweep, i, l in self.loop_generator(self.warm_sweeps):
+        for sweep, l, i in self.loop_generator(self.warm_sweeps):
             # Update Configuration
             self.config.update(i, l)
 
@@ -203,6 +233,18 @@ class LatticeQMC:
                 self.config = old_config
 
     def measure_loop_det(self):
+        def plot_gf_tau(beta, gf):
+            tau = np.linspace(0, beta, gf.shape[0])
+            fig, ax = plt.subplots()
+            ax.set_ylim(-2, 2)
+            ax.grid()
+            # ax.set_xlim(0, beta)
+            ax.set_xlabel(r"$\tau$")
+            ax.set_ylabel(r"$G(\tau)$")
+            for i, y in enumerate(gf.T):
+                ax.plot(tau, y, label="$G_{" + f"{i}, {i}" + "}$")
+            ax.legend()
+            return fig, ax
         r""" Runs the slow version of the LQMC measurement-loop and returns the Green's function.
 
         Returns
@@ -226,7 +268,7 @@ class LatticeQMC:
 
         # QMC loop
         number = 0
-        for sweep, i, l in self.loop_generator(self.meas_sweeps):
+        for sweep, l, i in self.loop_generator(self.meas_sweeps):
             # Update Configuration
             self.config.update(i, l)
 
@@ -244,20 +286,19 @@ class LatticeQMC:
                 old_config = self.config.copy()
             else:
                 # Move not accepted
-                self.config = old_config
-
+                self.config = old_config.copy()
             # Add temp greens function to total gf after each step
             gf_up += g_tmp_up
             gf_dn += g_tmp_dn
             number += 1
         # Return the normalized gfs for each spin
-        return np.array([gf_up, gf_dn]) / number
+        return np.array([gf_up / number, gf_dn / number])
 
     def warmup_loop(self):
         """ Runs the fast version of the LQMC warmup-loop """
         self.status = "Warmup"
         # QMC loop
-        for sweep, i, l in self.loop_generator(self.warm_sweeps):
+        for sweep, l, i in self.loop_generator(self.warm_sweeps):
             m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
             arg = 2 * self.lamb * self.config[i, l]
             d_up = 1 + (1 - np.linalg.inv(m_up)[i, i]) * (np.exp(-arg) - 1)
@@ -288,7 +329,7 @@ class LatticeQMC:
 
         # QMC loop
         number = 0
-        for sweep, i, l in self.loop_generator(self.meas_sweeps):
+        for sweep, l, i in self.loop_generator(self.meas_sweeps):
             m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
             arg = 2 * self.lamb * self.config[i, l]
 
