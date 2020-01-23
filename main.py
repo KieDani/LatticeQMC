@@ -70,7 +70,7 @@ def plot_gf_tau(beta, gf):
 def main():
     # Model parameters
     n_sites = 3
-    u, t = 4, 1
+    u, t = 2, 1
     temp = 4.
     beta = 1 / temp
     # Simulation parameters

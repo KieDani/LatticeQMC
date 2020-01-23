@@ -178,6 +178,34 @@ class LatticeQMC:
     #         g[l, :, :] = np.linalg.inv(np.eye(self.n_sites) + b_prod)
     #         #print(g[l,...])
     #     return g[::-1]
+    #
+    # def _gf_tau(self, g_beta, sigma):
+    #     #print('start')
+    #     g = np.zeros((self.time_steps, self.n_sites, self.n_sites), dtype=np.float64)
+    #     g[0, :, :] = g_beta
+    #     arr = np.asarray(range(0, self.time_steps - 1))
+    #     arr2 = arr.copy()
+    #     for l in range(1, self.time_steps):
+    #         front = arr2[0]
+    #         arr2[0:len(arr) - 1] = arr2[1:len(arr) - 0]
+    #         arr2[len(arr) - 1] = front
+    #         #print(arr2)
+    #         #calculate g[l, ...]
+    #         lmax = self.config.time_steps - 1 - l
+    #         # compute prod(B)
+    #         exp_v = self._exp_v(lmax, sigma)
+    #         # b = np.dot(exp_v, self.exp_k)
+    #         b = np.dot(self.exp_k, exp_v)
+    #         b_prod = b
+    #         for l2 in reversed(arr2):
+    #             exp_v = self._exp_v(l, sigma)
+    #             # b = np.dot(self.exp_k, exp_v)
+    #             b = self._b(exp_v)
+    #             b_prod = np.dot(b_prod, b)
+    #             #print()
+    #         g[l, :, :] = np.linalg.inv(np.eye(self.n_sites) + b_prod)
+    #         #print(g[l,...])
+    #     return g[::-1]
 
 
 
