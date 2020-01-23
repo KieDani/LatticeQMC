@@ -75,8 +75,8 @@ def main():
     beta = 1 / temp
     # Simulation parameters
     time_steps = 15
-    warmup = 200
-    sweeps = 200
+    warmup = 400
+    sweeps = 600
     cores = 1  # None to use all cores of the cpu
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
@@ -88,8 +88,8 @@ def main():
         print("GF data loaded")
     except FileNotFoundError:
         print("Found no data...")
-        g_tau = measure(model, beta, time_steps, warmup, sweeps, cores=cores, det_mode=False)
-        #save_gf_tau(model, beta, time_steps, sweeps, g_tau)
+        g_tau = measure(model, beta, time_steps, warmup, sweeps, cores=cores, det_mode=True)
+        save_gf_tau(model, beta, time_steps, sweeps, g_tau)
         print("Saving")
 
     gf_up, gf_dn = get_local_gf_tau(g_tau)
@@ -102,7 +102,6 @@ def main():
     plt.show()
 
     print('fillings:')
-    print(g_tau)
     print_filling(g_tau[0][0], g_tau[1][0])
     print_filling(g_tau[0][5], g_tau[1][5])
     print_filling(g_tau[0][time_steps-1], g_tau[1][time_steps-1])
