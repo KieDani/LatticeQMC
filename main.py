@@ -12,68 +12,8 @@ To do
 import time
 import numpy as np
 import matplotlib.pyplot as plt
-from lqmc import HubbardModel, LatticeQMC, LqmcProcessManager
-from lqmc.tools import check_params, save_gf_tau, load_gf_tau, print_filling
-
-
-def measure(model, beta, time_steps, warmup, sweeps, cores=None):
-    """ Runs the lqmc warmup and measurement loop for the given model.
-
-    Parameters
-    ----------
-    model: HubbardModel
-        The Hubbard model instance.
-    beta: float
-        The inverse temperature .math'\beta = 1/T'.
-    time_steps: int
-        Number of time steps from .math'0' to .math'\beta'
-    sweeps: int, optional
-        Total number of sweeps (warmup + measurement)
-    warmup int, optional
-        The ratio of sweeps used for warmup. The default is '0.2'.
-    cores: int, optional
-        Number of processes to use. If not specified one process per core is used.
-
-    Returns
-    -------
-    gf: (2, N, N) np.ndarray
-        Measured Green's function .math'G' of the up- and down-spin channel.
-    """
-    check_params(model.u, model.t, beta / time_steps)
-    if cores is not None and cores == 1:
-        solver = LatticeQMC(model, beta, time_steps, warmup, sweeps)
-        print("Warmup:     ", solver.warm_sweeps)
-        print("Measurement:", solver.meas_sweeps)
-        t0 = time.time()
-        gf_tau = solver.run_lqmc()
-        t = time.time() - t0
-        mins, secs = divmod(t, 60)
-        print(f"\nTotal time: {int(mins):0>2}:{int(secs):0>2} min")
-        print()
-    else:
-        manager = LqmcProcessManager(cores)
-        manager.init(model, beta, time_steps, warmup, sweeps)
-        manager.start()
-        manager.run()
-        gf_data = manager.recv_all()
-        manager.join()
-        manager.terminate()
-        gf_tau = np.sum(gf_data, axis=0) / manager.cores
-    return gf_tau
-
-
-def get_local_gf_tau(g_tau):
-    """ Returns the local elements (diagonal) of the Green's function matrix
-    Parameters
-    ----------
-    g_tau: (..., M, N, N) array_like
-        Green's function matrices for M time steps and N sites
-
-    Returns
-    -------
-    gf_tau: (..., M, N) np.ndarray
-    """
-    return np.diagonal(g_tau, axis1=-2, axis2=-1)
+from lqmc import HubbardModel, measure
+from lqmc.tools import save_gf_tau, load_gf_tau, print_filling, local_gf
 
 
 def tau2iw_dft(gf_tau, beta):
@@ -115,18 +55,17 @@ def plot_gf_tau(beta, gf):
 def main():
     # Model parameters
     n_sites = 10
-    u, t = 0, 1
-    temp = 2
+    u, t = 6, 1
+    temp = 200
     beta = 1 / temp
     # Simulation parameters
-    time_steps = 25
+    time_steps = 50
     warmup = 500
     sweeps = 5000
-    cores = 5  # None to use all cores of the cpu
+    cores = 1  # None to use all cores of the cpu
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
-
     try:
         g_tau = load_gf_tau(model, beta, time_steps, sweeps)
         print("GF data loaded")
@@ -136,7 +75,7 @@ def main():
         save_gf_tau(model, beta, time_steps, sweeps, g_tau)
         print("Saving")
 
-    gf_up, gf_dn = get_local_gf_tau(g_tau)
+    gf_up, gf_dn = local_gf(g_tau)
     gf_omega_up = tau2iw_dft(gf_up, beta)
     gf_omega_dn = tau2iw_dft(gf_dn, beta)
 

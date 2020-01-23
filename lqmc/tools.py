@@ -110,7 +110,7 @@ def matsubara_frequencies(points, beta):
 
 
 def fermi_fct(eps, beta):
-    r"""Return the Fermi function `1/(exp(βϵ)+1)`.
+    r"""Return the Fermi function '1/(exp(βϵ)+1)'.
 
     For complex inputs the function is not as accurate as for real inputs.
 
@@ -119,27 +119,12 @@ def fermi_fct(eps, beta):
     eps : complex or float or ndarray
         The energy at which the Fermi function is evaluated.
     beta : float
-        The inverse temperature :math:`beta = 1/k_B T`.
+        The inverse temperature :math:'beta = 1/(k_B T)'.
 
     Returns
     -------
     fermi_fct : complex of float or ndarray
         The Fermi function, same type as eps.
-
-    See Also
-    --------
-    fermi_fct_inv : The inverse of the Fermi function for real arguments
-
     """
-    z = eps*beta
-    try:
-        return 0.5 * (1. + np.tanh(-0.5 * beta * eps))
-    except TypeError:
-        pass  # complex arguments not handled by expit
-    z = np.asanyarray(z)
-    pos = z.real > 0
-    res = np.empty_like(z)
-    res[~pos] = 1./(np.exp(z[~pos]) + 1)
-    exp_m = np.exp(-z[pos])
-    res[pos] = exp_m/(1 + exp_m)
-    return res
+    return 0.5 * (1. + np.tanh(-0.5 * beta * eps))
+

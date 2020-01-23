@@ -11,19 +11,19 @@ import numpy as np
 class Configuration:
     """ Configuration class representing the hubbard-Stratonovich (HS) field."""
 
-    def __init__(self, n, time_steps):
+    def __init__(self, n_sites, time_steps):
         """ Constructor of the Configuration class
 
         Parameters
         ----------
-        n: int
+        n_sites: int
             Number of spatial lattice sites.
         time_steps: int
             Number of time slices (per site).
         """
-        self.n = n
+        self.n_sites = n_sites
         self.time_steps = time_steps
-        self.config = np.zeros((n, time_steps), dtype=np.int8)
+        self.config = np.zeros((n_sites, time_steps), dtype=np.int8)
         self.initialize()
 
     @property
@@ -37,14 +37,14 @@ class Configuration:
         -------
         config: Configuration
         """
-        config = Configuration(self.n, self.time_steps)
+        config = Configuration(self.n_sites, self.time_steps)
         config.config = np.copy(self.config)
         return config
 
     def initialize(self):
         """ Initializes the configuration with a random distribution of -1 and +1 """
         # Create an array of random 0 and 1.
-        config = np.random.randint(0, 2, size=(self.n, self.time_steps))
+        config = np.random.randint(0, 2, size=(self.n_sites, self.time_steps))
         # Scale array to -1 and 1
         self.config = 2*config - 1
 
@@ -84,6 +84,11 @@ class Configuration:
         return self.config[item]
 
     def __str__(self):
-        return str(self.config.T)
+        delim = " "
+        rows = [r"i\l  " + delim.join([f"{i:^3}" for i in range(self.time_steps)])]
+        for site in range(self.n_sites):
+            row = delim.join([f"{x:^3}" for x in self.config[site]])
+            rows.append(f"{site:<3} [{row}]")
+        return "\n".join(rows)
 
 

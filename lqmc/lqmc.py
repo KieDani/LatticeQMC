@@ -47,12 +47,13 @@ class LatticeQMC:
         self.status = ""
         self.it = 0
 
-        # Cachwd variables
+        # Cached variables
         self.ham_kin = self.model.ham_kinetic()
         self.lamb = np.arccosh(np.exp(self.model.u * self.dtau / 2.)) if self.model.u else 1
-        self.exp_k = expm(-1 * self.dtau * self.ham_kin)
+        self.exp_k = expm(+1 * self.dtau * self.ham_kin)
         self.exp_v = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
-        # self.v = np.zeros((self.n_sites, self.n_sites), dtype=self.config.dtype)
+        self.exp_k_inv = expm(+1 * self.dtau * self.ham_kin)
+        self.exp_v_inv = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
 
     def log_iterstep(self, sweep, i, l, ratio, acc):
         logging.debug(f"{self.status} {sweep} i={i}, l={l} - ratio={ratio:.3f}, accepted={acc}")
@@ -79,7 +80,7 @@ class LatticeQMC:
                 print(f"\r{self.status} Sweep {sweep} [{i}, {l}]", end="", flush=True)
                 yield sweep, i, l
 
-    def _exp_v(self, l, sigma):
+    def _exp_v(self, l, sigma, inv=True):
         r""" Computes the Matrix exponential of 'V_\sigma(l)'
 
         To Do
@@ -98,8 +99,12 @@ class LatticeQMC:
         -------
         exp_v: (N, N) np.ndarray
         """
-        np.fill_diagonal(self.exp_v, np.exp(-1 * sigma * self.lamb * self.config[:, l]))
-        return self.exp_v
+        if inv:
+            np.fill_diagonal(self.exp_v_inv, np.exp(-1 * sigma * self.lamb * self.config[:, l]))
+            return self.exp_v_inv
+        else:
+            np.fill_diagonal(self.exp_v, np.exp(+1 * sigma * self.lamb * self.config[:, l]))
+            return self.exp_v
 
     def _m(self, sigma):
         r""" Computes the 'M' matrices for spin '\sigma'
@@ -133,10 +138,10 @@ class LatticeQMC:
         g[0, :, :] = g_beta
         for l in range(1, self.time_steps):
             exp_v = self._exp_v(l, sigma)
+            exp_v_inv = self._exp_v(l, sigma, inv=True)
             b = np.dot(exp_v, self.exp_k)
-            b_inv = np.linalg.inv(b)
-            # fast and robust way of calculating b_inv
-            # b_inv = np.dot(exp_min_k, exp_min_v)
+            # b_inv = np.linalg.inv(b)
+            b_inv = np.dot(exp_v_inv, self.exp_k_inv)
             g[l, ...] = np.dot(np.dot(b_inv, g[l - 1, ...]), b)
         return g[::-1]
 
