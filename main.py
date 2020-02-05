@@ -41,7 +41,7 @@ def measure(model, beta, time_steps, warmup, sweeps, cores=None):
     """
     check_params(model.u, model.t, beta / time_steps)
     if cores is not None and cores == 1:
-        solver = LatticeQMC(model, beta, time_steps, warmup, sweeps)
+        solver = LatticeQMC(model, beta, time_steps, warmup, sweeps, det_mode=True)
         print("Warmup:     ", solver.warm_sweeps)
         print("Measurement:", solver.meas_sweeps)
         t0 = time.time()
@@ -114,15 +114,15 @@ def plot_gf_tau(beta, gf):
 
 def main():
     # Model parameters
-    n_sites = 10
+    n_sites = 5
     u, t = 0, 1
     temp = 2
     beta = 1 / temp
     # Simulation parameters
-    time_steps = 25
+    time_steps = 15
     warmup = 500
-    sweeps = 5000
-    cores = 5  # None to use all cores of the cpu
+    sweeps = 10000
+    cores = 1  # None to use all cores of the cpu
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
