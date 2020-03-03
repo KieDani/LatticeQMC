@@ -22,14 +22,14 @@ class Configuration:
             Number of spatial lattice sites.
         time_steps: int
             Number of time slices (per site).
-        array: np.ndarray, optional
+        array: np.ndarray of np.int8, optional
             Existing configuration to use.
         """
         self.n_sites = n_sites
         self.time_steps = time_steps
         self.config = np.ndarray
         if array is not None:
-            self.config = array.astype(self.dtype)
+            self.config = array
         else:
             self.initialize()
 
@@ -88,7 +88,7 @@ class Configuration:
     def string_bulk(self, delim=" "):
         rows = list()
         for site in range(self.n_sites):
-            row = delim.join([f"{x:^3}" for x in self.config[site]])
+            row = delim.join([f"{x:^3}" for x in self.config[site, :]])
             rows.append(f"{site:<3} [{row}]")
         return "\n".join(rows)
 
