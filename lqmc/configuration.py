@@ -29,7 +29,7 @@ class Configuration:
         self.time_steps = time_steps
         self.config = np.ndarray
         if array is not None:
-            self.config = array
+            self.config = array.astype(self.dtype)
         else:
             self.initialize()
 
