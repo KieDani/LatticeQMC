@@ -86,7 +86,7 @@ class LqmcProcessManager:
     def all_done(self):
         return all(self.processes_done()) or not any(self.processes_alive())
 
-    def init(self, model, beta, time_steps,  warm_sweeps=300, meas_sweeps=2000, det_mode=False):
+    def init(self, model, temp, time_steps,  warm_sweeps=300, meas_sweeps=2000, det_mode=False):
         self.warm_sweeps = warm_sweeps
         self.measure_sweeps = np.full(self.cores, meas_sweeps / self.cores, dtype="int")
         self.measure_sweeps[0] += meas_sweeps - np.sum(self.measure_sweeps)
@@ -95,7 +95,8 @@ class LqmcProcessManager:
         for i in range(self.cores):
             recv_end, send_end = multiprocessing.Pipe(False)
             meas_sweeps = self.measure_sweeps[i]
-            p = LqmcProcess(i, self.iters, send_end, model, beta, time_steps, self.warm_sweeps, meas_sweeps, det_mode)
+            p = LqmcProcess(i, self.iters, send_end, model, time_steps, self.warm_sweeps, meas_sweeps, det_mode)
+            p.set_temperature(temp)
             self.processes.append(p)
             self.pipes.append(recv_end)
 

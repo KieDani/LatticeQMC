@@ -8,7 +8,6 @@ version: 1.0
 """
 import numpy as np
 from collections import namedtuple
-from scipy.special import expit
 from .tools import fermi_fct, matsubara_frequencies
 
 PoleGf = namedtuple('PoleGf', ['resids', 'poles'])

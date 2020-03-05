@@ -24,24 +24,27 @@ def reconstruct(rv, xi, rv_inv, diag=False):
         return (rv * xi[..., np.newaxis, :]) @ rv_inv
 
 
+def noninter_gf(ham, beta):
+    rv, xi, rv_inv = decompose(ham)
+    tau = np.linspace(0, beta, num=2049)
+    # append axis, as we don't want the sum here
+    diag_gf_tau = pole_gf_tau(tau, xi[..., np.newaxis], weights=1, beta=beta)
+    gf_tau = reconstruct(rv, diag_gf_tau, rv_inv)
+    gf_tau = np.moveaxis(gf_tau, 0, -1)  # Convert to shape (site, site, tau)
+    return tau, gf_tau
+
+
 def main():
     # Model parameters
-    n_sites = 3
+    n_sites = 10
     u, t = 0, 1
     temp = 1 / 4
     beta = 1 / temp
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites, cycling=False)
-
     ham = model.ham_kinetic()
-    rv, xi, rv_inv = decompose(ham)
-
-    tau = np.linspace(0, beta, num=2049)
-    # append axis, as we don't want the sum here
-    diag_gf_tau = pole_gf_tau(tau, xi[..., np.newaxis], weights=1, beta=beta)
-    gf_tau = reconstruct(rv, diag_gf_tau, rv_inv)
-    gf_tau = np.moveaxis(gf_tau, 0, -1)  # Convert to shape (site, site, tau)
+    tau, gf_tau = noninter_gf(ham, beta)
 
     fig, ax = plt.subplots()
     for site in range(model.n_sites):

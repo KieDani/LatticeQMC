@@ -6,6 +6,50 @@ project: LatticeQMC
 version: 1.0
 """
 import numpy as np
+from .tools import Plot
+
+
+class ConfigStatPlot(Plot):
+
+    def __init__(self, xlabel="Sweeps"):
+        super().__init__()
+        self.ax.set_xlabel(xlabel)
+        self.mean = None
+        self.var = None
+        self.x = list()
+
+    @classmethod
+    def empty(cls, xlabel="Sweeps"):
+        self = cls(xlabel)
+        self.plot([], [])
+        return self
+
+    def plot(self, mean, var):
+        self.x = list(range(len(mean)))
+        self.mean = self.ax.plot(self.x, mean, label="MC Mean")[0]
+        self.var = self.ax.plot(self.x, var, label="MC Var")[0]
+        self.ax.legend()
+        self.ax.grid()
+
+    def update(self, mean, var):
+        self.x.append(len(self.x))
+        self.mean.set_data(self.x, np.append(self.mean.get_ydata(), mean))
+        self.var.set_data(self.x, np.append(self.var.get_ydata(), var))
+        self.autoscale()
+
+
+class ConfigPlot(Plot):
+
+    def __init__(self, config):
+        super().__init__()
+        self.im = self.ax.matshow(config.config.T, cmap="binary")
+        self.ax.xaxis.tick_bottom()
+        self.ax.invert_yaxis()
+        self.ax.set_xlabel("Sites")
+        self.ax.set_ylabel(r"$\tau$")
+
+    def update(self, config):
+        self.im.set_data(config.config.T)
 
 
 class Configuration:
@@ -76,6 +120,14 @@ class Configuration:
         """
         return self.config[i, t]
 
+    def mean(self):
+        """ float: Computes the Monte-Carlo sample mean """
+        return np.mean(self.config)
+
+    def var(self):
+        """ float: Computes the Monte-Carlo sample variance """
+        return np.var(self.config)
+
     def __eq__(self, other):
         return np.all(self.config == other.config)
 
@@ -97,3 +149,9 @@ class Configuration:
         string = self.string_header(delim) + "\n"
         string += self.string_bulk(delim)
         return string
+
+    def show(self, show=True):
+        plot = ConfigPlot(self)
+        if show:
+            plot.show()
+        return plot

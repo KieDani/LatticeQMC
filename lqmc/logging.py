@@ -4,7 +4,7 @@ Created on 03 Mar 2020
 author: Dylan Jones
 """
 import logging
-from logging import getLogger
+from logging import getLogger, INFO, DEBUG, WARNING
 
 BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
 
@@ -57,7 +57,7 @@ class FileHandler(logging.FileHandler):
 
 logger = getLogger('lqmc')
 
-ch = ConsoleHandler(logging.INFO)
-fh = FileHandler("test.log", logging.DEBUG)
+ch = ConsoleHandler(INFO)
+fh = FileHandler("test.log", DEBUG)
 logger.addHandler(ch)
 logger.addHandler(fh)
