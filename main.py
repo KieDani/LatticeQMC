@@ -39,12 +39,7 @@ def measure(model, temp, time_steps, warmup, sweeps, cores=None):
     if cores is not None and cores == 1:
         solver = LatticeQMC(model, time_steps, warmup, sweeps, det_mode=True)
         solver.set_temperature(temp)
-        t0 = time.time()
-        gf_tau = solver.run_lqmc()
-        t = time.time() - t0
-        mins, secs = divmod(t, 60)
-        print(f"\nTotal time: {int(mins):0>2}:{int(secs):0>2} min")
-        print()
+        gf_tau = solver.run()
     else:
         manager = LqmcProcessManager(cores)
         manager.init(model, temp, time_steps, warmup, sweeps)
