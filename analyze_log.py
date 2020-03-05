@@ -17,6 +17,11 @@ class LqmcLog:
     def __getitem__(self, item):
         return self.lines[0]
 
+    @staticmethod
+    def split_head(line):
+        head, msg = line.split(" - ", 1)
+        return head.strip(), msg.strip()
+
     def iter_section(self, name):
         start = name.upper()
         end = "END " + name.upper()
@@ -30,30 +35,44 @@ class LqmcLog:
             idx += 1
             line = self.lines[idx]
 
-    def get_warmup_config_stats(self):
-        logs = list(self.iter_section("warmup"))
+    def get_param(self, name):
+        for line in self.iter_section("init"):
+            _, msg = self.split_head(line)
+            if name in msg:
+                _, string = msg.split("=")
+                return float(string)
+        return None
+
+    def print_init(self):
+        for line in self.iter_section("init"):
+            print(line)
+
+    def get_config_states(self, status="warmup"):
+        logs = list(self.iter_section(status))
         n = len(logs)
         stats = np.zeros((n, 2), dtype="float")
         for i in range(n):
-            head, msg = logs[i].split(" - ", 1)
+            head, msg = self.split_head(logs[i])
             string = msg.strip().split(" -- ")[-1]
             mean, var = string.split(" ")
             stats[i] = float(mean), float(var)
-        return stats.T
+        sweep = np.arange(n) / int(self.get_param("time_steps") * self.get_param("sites"))
+        return sweep, stats.T
 
-    def plot_warmup_config_stats(self):
-        stats = self.get_warmup_config_stats()
+    def plot_config_stats(self, status="warmup"):
+        sweep, stats = self.get_config_states(status)
         fig, ax = plt.subplots()
-        ax.set_xlabel("Step")
-        ax.plot(stats[0], label="MC mean")
-        ax.plot(stats[1], label="MC var")
+        ax.set_xlabel("Sweep")
+        ax.plot(sweep, stats[0], label="MC mean")
+        ax.plot(sweep, stats[1], label="MC var")
         ax.legend()
         plt.show()
 
 
 def main():
     log = LqmcLog()
-    log.plot_warmup_config_stats()
+    log.print_init()
+    log.plot_config_stats("warmup")
 
 
 if __name__ == "__main__":

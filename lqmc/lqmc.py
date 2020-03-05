@@ -64,7 +64,6 @@ class LatticeQMC:
         self.logger.debug(f"u=          {self.model.u}")
         self.logger.debug(f"t=          {self.model.t}")
         self.logger.debug(f"mu=         {self.model.mu}")
-        self.logger.debug(f"beta=       {self.beta}")
         self.logger.debug(f"sites=      {self.n_sites}")
         self.logger.debug(f"time_steps= {self.time_steps}")
         self.logger.debug(f"det_mode=   {self.det_mode}")
