@@ -10,9 +10,7 @@ import numpy as np
 from scipy.linalg import expm
 from lqmc import HubbardModel, Configuration
 from lqmc.configuration import ConfigStatPlot
-from lqmc.logging import logger, DEBUG
-
-logger.setLevel(DEBUG)
+from lqmc.logging import get_logger, DEBUG
 
 
 class LatticeQMC:
@@ -34,7 +32,9 @@ class LatticeQMC:
             Flag for the calculation mode. If 'True' the slow algorithm via
             the determinants is used. The default i9s 'False' (faster).
         """
-        logger.debug(f"INIT")
+        self.logger = get_logger()
+        self.logger.setLevel(DEBUG)
+        self.logger.debug(f"INIT")
 
         # Constant attributes
         self.model = model
@@ -61,15 +61,16 @@ class LatticeQMC:
         self.exp_v = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
         self.exp_v_inv = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
 
-        logger.debug(f"u={self.model.u}")
-        logger.debug(f"t={self.model.t}")
-        logger.debug(f"mu={self.model.mu}")
-        logger.debug(f"beta={self.beta}")
-        logger.debug(f"sites=       {self.n_sites}")
-        logger.debug(f"time_steps=  {self.time_steps}")
-        logger.debug(f"det_mode=    {self.det_mode}")
-        logger.info(f"Warmup=      {self.warm_sweeps}")
-        logger.info(f"Measurement= {self.meas_sweeps}")
+        self.logger.debug(f"u=          {self.model.u}")
+        self.logger.debug(f"t=          {self.model.t}")
+        self.logger.debug(f"mu=         {self.model.mu}")
+        self.logger.debug(f"beta=       {self.beta}")
+        self.logger.debug(f"sites=      {self.n_sites}")
+        self.logger.debug(f"time_steps= {self.time_steps}")
+        self.logger.debug(f"det_mode=   {self.det_mode}")
+        self.logger.info(f"Warmup=     {self.warm_sweeps}")
+        self.logger.info(f"Measurement={self.meas_sweeps}")
+        self.logger.debug(f"END INIT")
 
     def set_temperature(self, temp):
         """ Sets the temperature and initializes the calculation.
@@ -78,7 +79,7 @@ class LatticeQMC:
         ----------
         temp: float
         """
-        logger.debug(f"SETUP")
+        self.logger.debug(f"SETUP")
         beta = 1 / temp
         self.dtau = beta / self.time_steps
         self.beta = beta
@@ -88,13 +89,14 @@ class LatticeQMC:
         self.exp_k_inv = expm(-1 * self.dtau * self.ham_kin)
         check_val = self.model.u * self.model.t * self.dtau ** 2
 
-        logger.debug(f"beta=  {self.beta}")
-        logger.debug(f"dtau=  {self.dtau}")
-        logger.debug(f"lambda={self.lamb}")
+        self.logger.debug(f"beta=       {self.beta}")
+        self.logger.debug(f"dtau=       {self.dtau}")
+        self.logger.debug(f"lambda=     {self.lamb}")
         if check_val < 0.1:
-            logger.info(f"Check-value {check_val:.2} is smaller than 0.1!")
+            self.logger.info(f"Check-value {check_val:.2} is smaller than 0.1!")
         else:
-            logger.warning(f"Check-value {check_val:.2} should be smaller than 0.1!")
+            self.logger.warning(f"Check-value {check_val:.2} should be smaller than 0.1!")
+        self.logger.debug(f"END SETUP")
 
     # =========================================================================
 
@@ -132,7 +134,8 @@ class LatticeQMC:
         Notes
         -----
         In the warmup loop of the determinant-mode the cyclic permutation is not needed.
-        The timeslice 'l_index' can be left at 0 to skip first loop in the computation of the matrix-product.
+        The timeslice 'l_index' can be left at 0 to skip the first loop in the computation
+        of the matrix-product.
 
         Parameters
         ----------
@@ -215,11 +218,11 @@ class LatticeQMC:
         """
         log = f"{self.status} {self.it + 1} -- {l:>2} {i:>2} -- {self.ratio:.1f} ({self.acc})"
         log += f" -- {self.config.mean():.3f} {self.config.var():.3f}"
-        logger.debug(log)
+        self.logger.debug(log)
 
     def iter_sweeps(self, n, console_updates=200):
-        logger.debug("START " + self.status.upper())
-        print_interval = int(n/console_updates)
+        self.logger.debug(self.status.upper())
+        print_interval = max(1, int(n/console_updates))
         for it in range(n):
             count = it + 1
             if it < n and count % print_interval == 0:
@@ -229,7 +232,7 @@ class LatticeQMC:
             self.it = it
             yield it
         print(f"\r{self.status} Sweep {n} (100.0%)")
-        logger.debug("END " + self.status.upper())
+        self.logger.debug("END " + self.status.upper())
 
     def _warmup_step_det(self, old_det):
         # Iterate over all time-steps, starting at the end (.math:'\beta')
@@ -271,7 +274,7 @@ class LatticeQMC:
         for _ in self.iter_sweeps(self.warm_sweeps):
             old_det = self._warmup_step_det(old_det)
 
-    def warmup_loop_det_animated(self, plot_updates=10):
+    def warmup_loop_det_animated(self, plot_updates=1):
         """ Runs the slow version of the LQMC warmup-loop """
         self.status = "Warmup"
 
@@ -292,7 +295,6 @@ class LatticeQMC:
                 config_plot.update(self.config)
                 stat_plot.draw()
                 config_plot.draw()
-        stat_plot.show()
 
     def measure_loop_det(self):
         r""" Runs the slow version of the LQMC measurement-loop and returns the Green's function.
@@ -464,5 +466,5 @@ class LatticeQMC:
         gf_tau = self.run_lqmc()
         t = time.time() - t0
         mins, secs = divmod(t, 60)
-        logger.info(f"Total time: {int(mins):0>2}:{int(secs):0>2} min")
+        self.logger.info(f"Total time: {int(mins):0>2}:{int(secs):0>2} min")
         return gf_tau

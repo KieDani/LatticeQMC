@@ -6,6 +6,8 @@ author: Dylan Jones
 import logging
 from logging import getLogger, INFO, DEBUG, WARNING
 
+FILE = "lqmc.log"
+
 BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
 
 
@@ -55,9 +57,16 @@ class FileHandler(logging.FileHandler):
         self.setLevel(level)
 
 
-logger = getLogger('lqmc')
+def get_logger(name='lqmc', file=FILE, console_lvl=INFO, file_lvl=DEBUG):
+    logger = getLogger(name)
+    ch = ConsoleHandler(console_lvl)
+    fh = FileHandler(file, file_lvl)
+    logger.addHandler(ch)
+    logger.addHandler(fh)
+    return logger
 
-ch = ConsoleHandler(INFO)
-fh = FileHandler("test.log", DEBUG)
-logger.addHandler(ch)
-logger.addHandler(fh)
+
+def read_log_file(file=FILE):
+    with open(file, "r") as f:
+        lines = f.readlines()
+    return [line[:-1] for line in lines]
