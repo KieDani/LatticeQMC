@@ -97,13 +97,14 @@ class LatticeQMC:
 
     # =========================================================================
 
-    def get_exp_v(self, l, sigma, inv=True):
+    def get_exp_v(self, l, sigma, inv=False, matrix_exp=False):
         r""" Computes the Matrix exponential of 'V_\sigma(l)'
 
-        To Do
+        Notes
         -----
-        This is pretty sure the main bottle-neck
-        Maybe scipy.sparse since V is diagonal?
+        Since .math:'V_\sigma(l) = diag(h_{l, 1}, \dots, h_{l, N}' is a diagonal matrix,
+        the numerical matrix exponential is not needed. The exponential of the diagonal elements
+        can be computed directly.
 
         Parameters
         ----------
@@ -113,27 +114,32 @@ class LatticeQMC:
             Spin value.
         inv: bool, optional
             Flag if inverse should be computed.
+        matrix_exp: bool, optional
+            Flag if the matrix-exponential should be computed numerically.
 
         Returns
         -------
         exp_v: (N, N) np.ndarray
         """
         sign = -1 if inv else +1
-        diag = +1 * sigma * self.lamb * self.config[:, l]
-        return np.diagflat(np.exp(sign * diag))
+        diag = sigma * self.lamb * self.config[:, l]
+        if matrix_exp:
+            return expm(np.diagflat(sign * diag))
+        else:
+            return np.diagflat(np.exp(sign * diag))
 
-    def get_m(self, l_index, sigma):
+    def get_m(self, l0, sigma):
         r""" Computes the 'M' matrices for spin '\sigma'
 
         Notes
         -----
         In the warmup loop of the determinant-mode the cyclic permutation is not needed.
-        The timeslice 'l_index' can be left at 0 to skip the first loop in the computation
+        The timeslice 'l0' can be left at 0 to skip the first loop in the computation
         of the matrix-product.
 
         Parameters
         ----------
-        l_index: int
+        l0: int
             Time-slice index used for cyclic permutation.
         sigma: int
             Spin value.
@@ -142,21 +148,19 @@ class LatticeQMC:
         -------
         m: (N, N) np.ndarray
         """
-        l_index = l_index % self.time_steps
-
-        # compute A=prod(B)
-        lmax = self.config.time_steps - 1
-        b_prod = 1
-        if l_index:
-            for l in reversed(range(0, l_index)):
-                exp_v = self.get_exp_v(l, sigma)
-                b = np.dot(self.exp_k, exp_v)
-                b_prod = np.dot(b_prod, b)
-        for l in reversed(range(l_index, lmax)):
+        # Initialize time slices in cyclic permutation:
+        # l0, l0-1, ..., 0, L-1, L-2, ..., l0+1
+        l0 = l0 % self.time_steps
+        indices = list(reversed(range(self.config.time_steps)))
+        time_indices = indices[-l0:] + indices[:-l0]
+        # compute A=prod(B_l)
+        exp_v = self.get_exp_v(time_indices[0], sigma)
+        b_prod = self.exp_k.dot(exp_v)
+        for l in time_indices[1:]:
             exp_v = self.get_exp_v(l, sigma)
-            b = np.dot(self.exp_k, exp_v)
+            b = self.exp_k.dot(exp_v)
             b_prod = np.dot(b_prod, b)
-        # Assemble M matrix
+        # Assemble M=I+prod(B)
         return np.eye(self.n_sites) + b_prod
 
     def _gf_tau(self, g_beta, sigma):
@@ -197,7 +201,7 @@ class LatticeQMC:
 
     # =========================================================================
 
-    def _debug_update(self, i, l):
+    def _debug(self, i, l):
         """ Logs the attributes of the iteration.
 
         Format of log is:
@@ -228,46 +232,46 @@ class LatticeQMC:
         print(f"\r{self.status} Sweep {n} (100.0%)")
         self.logger.debug("END " + self.status.upper())
 
+    def _warmup_step_det(self, old_det):
+        # Iterate over all time-steps, starting at the end (.math:'\beta')
+        for l in reversed(range(self.time_steps)):
+            # Iterate over all lattice sites
+            for i in range(self.n_sites):
+                # Update Configuration by flipping spin
+                self.config.update(i, l)
+                # Compute updated M matrices after config-update
+                m_up = self.get_m(0, sigma=+1)
+                m_dn = self.get_m(0, sigma=-1)
+                # Compute the new determinant for both matrices for the acceptance ratio
+                new_det = np.linalg.det(m_up) * np.linalg.det(m_dn)
+                self.ratio = new_det / old_det
+                self.acc = np.random.rand() <= min(self.ratio, 1)
+                if self.acc:
+                    # Move accepted:
+                    # Continue using the new configuration
+                    old_det = new_det
+                else:
+                    # Move not accepted:
+                    # Revert to the old configuration by updating again
+                    self.config.update(i, l)
+                self._debug(i, l)
+        return old_det
+
     def warmup_loop_det(self):
         """ Runs the slow version of the LQMC warmup-loop """
         self.status = "Warmup"
-
         # Calculate M matrices for both spins
         m_up = self.get_m(0, sigma=+1)
         m_dn = self.get_m(0, sigma=-1)
         # Initialize the determinant for both matrices
         old_det = np.linalg.det(m_up) * np.linalg.det(m_dn)
-
         # Warmup-sweeps
         for _ in self.iter_sweeps(self.warm_sweeps):
-            # Iterate over all time-steps, starting at the end (.math:'\beta')
-            for l in reversed(range(self.time_steps)):
-                # Iterate over all lattice sites
-                for i in range(self.n_sites):
-                    # Update Configuration by flipping spin
-                    self.config.update(i, l)
-                    # Compute updated M matrices after config-update
-                    m_up = self.get_m(0, sigma=+1)
-                    m_dn = self.get_m(0, sigma=-1)
-                    # Compute the new determinant for both matrices for the acceptance ratio
-                    new_det = np.linalg.det(m_up) * np.linalg.det(m_dn)
-                    self.ratio = new_det / old_det
-                    self.acc = np.random.rand() < self.ratio
-                    if self.acc:
-                        # Move accepted:
-                        # Continue using the new configuration
-                        old_det = new_det
-                    else:
-                        # Move not accepted:
-                        # Revert to the old configuration by updating again
-                        self.config.update(i, l)
-
-                    self._debug_update(i, l)
+            old_det = self._warmup_step_det(old_det)
 
     def warmup_loop_det_animated(self, plot_updates=1):
         """ Runs the slow version of the LQMC warmup-loop """
         self.status = "Warmup"
-
         # Calculate M matrices for both spins
         m_up = self.get_m(0, sigma=+1)
         m_dn = self.get_m(0, sigma=-1)
@@ -279,29 +283,7 @@ class LatticeQMC:
 
         # Warmup-sweeps
         for sweep in self.iter_sweeps(self.warm_sweeps):
-            # Iterate over all time-steps, starting at the end (.math:'\beta')
-            for l in reversed(range(self.time_steps)):
-                # Iterate over all lattice sites
-                for i in range(self.n_sites):
-                    # Update Configuration by flipping spin
-                    self.config.update(i, l)
-                    # Compute updated M matrices after config-update
-                    m_up = self.get_m(0, sigma=+1)
-                    m_dn = self.get_m(0, sigma=-1)
-                    # Compute the new determinant for both matrices for the acceptance ratio
-                    new_det = np.linalg.det(m_up) * np.linalg.det(m_dn)
-                    self.ratio = new_det / old_det
-                    self.acc = np.random.rand() < self.ratio
-                    if self.acc:
-                        # Move accepted:
-                        # Continue using the new configuration
-                        old_det = new_det
-                    else:
-                        # Move not accepted:
-                        # Revert to the old configuration by updating again
-                        self.config.update(i, l)
-
-                    self._debug_update(i, l)
+            old_det = self._warmup_step_det(old_det)
 
             stat_plot.update(self.config.mean(), self.config.var())
             if sweep % plot_updates == 0:
@@ -360,7 +342,7 @@ class LatticeQMC:
                         # Revert to the old configuration by updating again
                         self.config.update(i, l)
 
-                    self._debug_update(i, l)
+                    self._debug(i, l)
 
                     # Add result to total results
                     gf_total_up += gf_tmp_up
@@ -398,7 +380,7 @@ class LatticeQMC:
                     if self.acc:
                         self.config.update(i, l)
 
-                    self._debug_update(i, l)
+                    self._debug(i, l)
 
     def measure_loop(self):
         r""" Runs the fast version of the LQMC measurement-loop and returns the Green's function.
@@ -455,7 +437,7 @@ class LatticeQMC:
                         # Update Configuration
                         self.config.update(i, l)
 
-                    self._debug_update(i, l)
+                    self._debug(i, l)
 
                     # Add temp greens function to total gf after each step
                     gf_up += g_tmp_up

@@ -30,7 +30,7 @@ class LqmcLog:
             idx += 1
         idx += 1
         line = self.lines[idx]
-        while idx < self.n and end not in line:
+        while idx < self.n-1 and end not in line:
             yield line
             idx += 1
             line = self.lines[idx]
