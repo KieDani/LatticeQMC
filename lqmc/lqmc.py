@@ -49,7 +49,7 @@ class LatticeQMC:
 
         # Cachwd variables
         self.ham_kin = self.model.ham_kinetic()
-        self.lamb = np.arccosh(np.exp(self.model.u * self.dtau / 2.)) if self.model.u else 1
+        self.lamb = np.arccosh(np.exp(self.model.u * self.dtau / 2.))
         self.exp_k = expm(-1 * self.dtau * self.ham_kin)
         self.exp_v = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
         # self.v = np.zeros((self.n_sites, self.n_sites), dtype=self.config.dtype)
@@ -249,12 +249,12 @@ class LatticeQMC:
         # g_tmp_up, g_tmp_dn = self._compute_gf_tau(g_beta_up, g_beta_dn)
 
         # Initialize greens functions
-        g_total_up = np.zeros((self.time_steps, self.n_sites, self.n_sites), dtype=np.float64)
-        g_total_dn = np.zeros((self.time_steps, self.n_sites, self.n_sites), dtype=np.float64)
-        g_up = np.zeros((self.time_steps, self.n_sites, self.n_sites), dtype=np.float64)
-        g_dn = np.zeros((self.time_steps, self.n_sites, self.n_sites), dtype=np.float64)
-        g_up[-1, :, :] = np.linalg.inv(m_up)
-        g_dn[-1, :, :] = np.linalg.inv(m_dn)
+        g_total_up = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
+        g_total_dn = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
+        g_up = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
+        g_dn = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
+        g_up = np.linalg.inv(m_up)
+        g_dn = np.linalg.inv(m_dn)
 
         # QMC loop
         number = 0
@@ -274,9 +274,6 @@ class LatticeQMC:
                     acc = np.random.rand() < ratio
                     # Update accepted
                     if acc:
-                        # calculate updated greens function for time l
-                        g_up[l, :, :] = np.linalg.inv(m_up)
-                        g_dn[l, :, :] = np.linalg.inv(m_dn)
                         # update the configuration
                         old = new
                         old_config = self.config.copy()
@@ -284,10 +281,6 @@ class LatticeQMC:
                     else:
                         # return to old config by flipping the spin again
                         self.config.update(i, l)
-                    # Add result to total results
-                    g_total_up[l, :, :] += g_up[l, :, :]
-                    g_total_dn[l, :, :] += g_dn[l, :, :]
-                    number += 1
                 # Update greens function for calculation at the next time slice
                 # This is not yet needed, because the greens function is calculated
                 # every time explicitly. If the fast updating without the inversion
@@ -296,39 +289,18 @@ class LatticeQMC:
                 # If using this change back to the old _compute_m function, because
                 # order of the B matrices does not matter then as they are used 
                 # only within a determinant.
+            # Perform measurements
+            m_up, m_dn = self._compute_m()
+            g_up = np.linalg.inv(m_up)
+            g_dn = np.linalg.inv(m_dn)
+            g_total_up += g_up
+            g_total_dn += g_dn
         # Return the normalized total green functions
-        g_total_up = g_total_up / number * self.time_steps
-        g_total_dn = g_total_dn / number * self.time_steps
+        g_total_up = g_total_up / self.meas_sweeps
+        g_total_dn = g_total_dn / self.meas_sweeps
         # These are now separated, as we use them separated anyways
-        return np.array([g_total_up, g_total_dn])
+        return g_total_up, g_total_dn
 
-        # --- old loop
-        # for sweep, i, l in self.loop_generator(self.meas_sweeps):
-        #     # Update Configuration
-        #     self.config.update(i, l)
-
-        #     m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
-        #     new = np.linalg.det(m_up) * np.linalg.det(m_dn)
-        #     ratio = new / old
-        #     acc = np.random.rand() < ratio
-        #     if acc:
-        #         # Move accepted:
-        #         # Update temp greens function and continue using the new configuration
-        #         g_beta_up = np.linalg.inv(m_up)
-        #         g_beta_dn = np.linalg.inv(m_dn)
-        #         g_tmp_up, g_tmp_dn = self._compute_gf_tau(g_beta_up, g_beta_dn)
-        #         old = new
-        #         old_config = self.config.copy()
-        #     else:
-        #         # Move not accepted
-        #         self.config = old_config
-
-        #     # Add temp greens function to total gf after each step
-        #     gf_up += g_tmp_up
-        #     gf_dn += g_tmp_dn
-        #     number += 1
-        # # Return the normalized gfs for each spin
-        # return np.array([gf_up, gf_dn]) / number
 
     def warmup_loop(self):
         """ Runs the fast version of the LQMC warmup-loop """
@@ -401,11 +373,11 @@ class LatticeQMC:
     def run_lqmc(self):
         if self.det_mode:
             self.warmup_loop_det()
-            gf = self.measure_loop_det()
+            gf_up, gf_dn = self.measure_loop_det()
         else:
             self.warmup_loop()
             gf = self.measure_loop()
-        return gf
+        return gf_up, gf_dn
 
     def run(self):
         print("Warmup:     ", self.warm_sweeps)

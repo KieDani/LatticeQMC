@@ -89,7 +89,7 @@ class LqmcProcessManager:
     def init(self, model, beta, time_steps,  warm_sweeps=300, meas_sweeps=2000, det_mode=False):
         self.warm_sweeps = warm_sweeps
         self.measure_sweeps = np.full(self.cores, meas_sweeps / self.cores, dtype="int")
-        self.measure_sweeps[0] += meas_sweeps - np.sum(self.measure_sweeps)
+        self.measure_sweeps[0] += meas_sweeps - np.sum(self.measure_sweeps)  # seems unnecessary
         self.processes = list()
         self.pipes = list()
         for i in range(self.cores):

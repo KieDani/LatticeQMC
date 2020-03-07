@@ -45,7 +45,7 @@ def measure(model, beta, time_steps, warmup, sweeps, cores=None):
         print("Warmup:     ", solver.warm_sweeps)
         print("Measurement:", solver.meas_sweeps)
         t0 = time.time()
-        gf_tau = solver.run_lqmc()
+        gf_up, gf_dn = solver.run_lqmc()
         t = time.time() - t0
         mins, secs = divmod(t, 60)
         print(f"\nTotal time: {int(mins):0>2}:{int(secs):0>2} min")
@@ -59,7 +59,7 @@ def measure(model, beta, time_steps, warmup, sweeps, cores=None):
         manager.join()
         manager.terminate()
         gf_tau = np.sum(gf_data, axis=0) / manager.cores
-    return gf_tau
+    return gf_up, gf_dn
 
 
 def get_local_gf_tau(g_tau):
@@ -114,9 +114,9 @@ def plot_gf_tau(beta, gf):
 
 def main():
     # Model parameters
-    n_sites = 5
-    u, t = 0, 1
-    temp = 2
+    n_sites = 6
+    u, t = 4, 1
+    temp = 5
     beta = 1 / temp
     # Simulation parameters
     time_steps = 15
@@ -127,34 +127,49 @@ def main():
     model = HubbardModel(u=u, t=t, mu=u / 2)
     model.build(n_sites)
 
-    try:
-        g_tau = load_gf_tau(model, beta, time_steps, sweeps)
-        print("GF data loaded")
-    except FileNotFoundError:
-        print("Found no data...")
-        g_tau = measure(model, beta, time_steps, warmup, sweeps, cores=cores)
-        save_gf_tau(model, beta, time_steps, sweeps, g_tau)
-        print("Saving")
+    gf_up, gf_dn = measure(model, beta, time_steps, warmup, sweeps, cores=cores)
+    print("filling:")
+    filling_up = 1 - np.diagonal(gf_up)
+    filling_dn = 1 - np.diagonal(gf_dn)
+    print(f"<n↑> = ", filling_up)
+    print(f"<n↓> = ", filling_dn)
+    print()
+    print("double occupancy rate:")
+    do_rate = filling_up * filling_dn
+    print(do_rate)
+    print()
+    print("local moment:")
+    loc_moment = filling_up + filling_dn - 2 * do_rate
+    print(loc_moment)
 
-    gf_up, gf_dn = get_local_gf_tau(g_tau)
-    gf_omega_up = tau2iw_dft(gf_up, beta)
-    gf_omega_dn = tau2iw_dft(gf_dn, beta)
+    # try:
+    #     g_tau = load_gf_tau(model, beta, time_steps, sweeps)
+    #     print("GF data loaded")
+    # except FileNotFoundError:
+    #     print("Found no data...")
+    #     g_tau = measure(model, beta, time_steps, warmup, sweeps, cores=cores)
+    #     save_gf_tau(model, beta, time_steps, sweeps, g_tau)
+    #     print("Saving")
 
-    plot_gf_tau(beta, gf_up)
-    plot_gf_tau(beta, gf_dn)
-    plot_gf_tau(beta, gf_up + gf_dn)
+    # gf_up, gf_dn = get_local_gf_tau(g_tau)
+    # gf_omega_up = tau2iw_dft(gf_up, beta)
+    # gf_omega_dn = tau2iw_dft(gf_dn, beta)
 
-    print('fillings:')
-    print_filling(g_tau[0][0], g_tau[1][0])
-    print_filling(g_tau[0][5], g_tau[1][5])
-    print_filling(g_tau[0][7], g_tau[1][7])
-    print('G_iw:')
-    g_iw = tau2iw_dft(gf_up + gf_dn, beta)
-    print(g_iw)
-    print('Im(G_iw)')
-    print(g_iw.imag)
+    # plot_gf_tau(beta, gf_up)
+    # plot_gf_tau(beta, gf_dn)
+    # plot_gf_tau(beta, gf_up + gf_dn)
 
-    plt.show()
+    # print('fillings:')
+    # print_filling(g_tau[0][0], g_tau[1][0])
+    # print_filling(g_tau[0][5], g_tau[1][5])
+    # print_filling(g_tau[0][7], g_tau[1][7])
+    # print('G_iw:')
+    # g_iw = tau2iw_dft(gf_up + gf_dn, beta)
+    # print(g_iw)
+    # print('Im(G_iw)')
+    # print(g_iw.imag)
+
+    # plt.show()
 
 
 if __name__ == "__main__":
