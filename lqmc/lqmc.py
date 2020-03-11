@@ -240,13 +240,6 @@ class LatticeQMC:
 
         m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
         old = np.linalg.det(m_up) * np.linalg.det(m_dn)
-        old_config = self.config.copy()  # Store copy of current configuration
-
-        # Initialize total and temp greens functions --- old
-        # gf_up, gf_dn = 0, 0
-        # g_beta_up = np.linalg.inv(m_up)
-        # g_beta_dn = np.linalg.inv(m_dn)
-        # g_tmp_up, g_tmp_dn = self._compute_gf_tau(g_beta_up, g_beta_dn)
 
         # Initialize greens functions
         g_total_up = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
@@ -257,7 +250,6 @@ class LatticeQMC:
         g_dn = np.linalg.inv(m_dn)
 
         # QMC loop
-        number = 0
         # Breakup of the loop_generator because of steps needed in between
         for sweep in range(self.meas_sweeps):
             # We start at time beta and go down
@@ -305,16 +297,50 @@ class LatticeQMC:
     def warmup_loop(self):
         """ Runs the fast version of the LQMC warmup-loop """
         self.status = "Warmup"
+
+        m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
+        # Initialize greens functions
+        g_up = np.linalg.inv(m_up)
+        g_dn = np.linalg.inv(m_dn)
+
         # QMC loop
-        for sweep, i, l in self.loop_generator(self.warm_sweeps):
-            m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
-            arg = 2 * self.lamb * self.config[i, l]
-            d_up = 1 + (1 - np.linalg.inv(m_up)[i, i]) * (np.exp(-arg) - 1)
-            d_dn = 1 + (1 - np.linalg.inv(m_dn)[i, i]) * (np.exp(+arg) - 1)
-            ratio = d_up * d_dn
-            acc = np.random.rand() < ratio
-            if acc:
-                self.config.update(i, l)
+        for sweep in range(self.warm_sweeps):
+            # We start at time beta and go down
+            for l in reversed(range(self.time_steps)):
+                for i in range(self.n_sites):
+                    arg = 2 * self.lamb * self.config[i, l]
+                    d_up = 1 + (1 - g_up[i, i]) * (np.exp(-arg) - 1)
+                    d_dn = 1 + (1 - g_dn[i, i]) * (np.exp(+arg) - 1)
+                    ratio = d_up * d_dn
+                    acc = np.random.rand() < ratio
+                    if acc:
+                        # Update Greens function
+                        c_up = -(np.exp(-arg) - 1) * g_up[i, :]
+                        c_up[i] += (np.exp(-arg) - 1)
+                        c_dn = -(np.exp(+arg) - 1) * g_dn[i, :]
+                        c_dn[i] += (np.exp(+arg) - 1)
+                        # These are the bs in the tutorial, but I call them e
+                        # here to avoid confusing them with the B-matrices
+                        e_up = g_up[:, i] / (1 + c_up[i])
+                        e_dn = g_dn[:, i] / (1 + c_dn[i])
+
+                        for j in range(self.n_sites):
+                            for k in range(self.n_sites):
+                                g_up[j, k] = g_up[j, k] - e_up[j] * c_up[k]
+                                g_dn[j, k] = g_dn[j, k] - e_dn[j] * c_dn[k]
+                        
+                        # Update HS-field
+                        self.config.update(i, l)
+                # Update the GF for the next time slice (Wrapping)
+                if l > 0: # Only do this, if this is not the last l-loop
+                    exp_v_up = self._exp_v(l - 1, +1)
+                    exp_v_dn = self._exp_v(l - 1, -1)
+                    b_up = np.dot(exp_v_up, self.exp_k)
+                    b_dn = np.dot(exp_v_dn, self.exp_k)
+
+                    g_up = np.dot(np.dot(b_up, g_up), np.linalg.inv(b_up))
+                    g_dn = np.dot(np.dot(b_dn, g_dn), np.linalg.inv(b_dn))
+
 
     def measure_loop(self):
         r""" Runs the fast version of the LQMC measurement-loop and returns the Green's function.
