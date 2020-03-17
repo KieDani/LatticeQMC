@@ -41,7 +41,7 @@ def measure(model, beta, time_steps, warmup, sweeps, cores=None):
     """
     check_params(model.u, model.t, beta / time_steps)
     if cores is not None and cores == 1:
-        solver = LatticeQMC(model, beta, time_steps, warmup, sweeps, det_mode=True)
+        solver = LatticeQMC(model, beta, time_steps, warmup, sweeps, det_mode=False)
         print("Warmup:     ", solver.warm_sweeps)
         print("Measurement:", solver.meas_sweeps)
         t0 = time.time()
@@ -116,7 +116,7 @@ def main():
     # Model parameters
     n_sites = 6
     u, t = 4, 1
-    temp = 5
+    temp = 4
     beta = 1 / temp
     # Simulation parameters
     time_steps = 15

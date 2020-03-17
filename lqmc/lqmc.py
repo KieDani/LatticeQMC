@@ -298,21 +298,26 @@ class LatticeQMC:
         """ Runs the fast version of the LQMC warmup-loop """
         self.status = "Warmup"
 
-        m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
-        # Initialize greens functions
-        g_up = np.linalg.inv(m_up)
-        g_dn = np.linalg.inv(m_dn)
 
         # QMC loop
         for sweep in range(self.warm_sweeps):
+            m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
+            # Initialize greens functions
+            g_up = np.linalg.inv(m_up)
+            g_dn = np.linalg.inv(m_dn)
+            # with open('E:\\Download\\5.Semester\\Computational_Physics\\project\\loc.txt', mode='a') as f:
+            #     print(self.config[0], sep='\n', file=f)
+                # print((str(g_up[0, 0]) + ' --- ' + str(g_dn[0, 0])), sep='\n', file=f)
             # We start at time beta and go down
             for l in reversed(range(self.time_steps)):
                 for i in range(self.n_sites):
                     arg = 2 * self.lamb * self.config[i, l]
-                    d_up = 1 + (1 - g_up[i, i]) * (np.exp(-arg) - 1)
-                    d_dn = 1 + (1 - g_dn[i, i]) * (np.exp(+arg) - 1)
+                    d_up = 1 + (1 - g_up[i, i]) * (np.exp(+arg) - 1)
+                    d_dn = 1 + (1 - g_dn[i, i]) * (np.exp(-arg) - 1)
                     ratio = d_up * d_dn
                     acc = np.random.rand() < ratio
+                    # with open('E:\\Download\\5.Semester\\Computational_Physics\\project\\loc.txt', mode='a') as f:
+                    #     print(str(acc) + str(ratio), sep='\n', file=f)
                     if acc:
                         # Update Greens function
                         c_up = -(np.exp(-arg) - 1) * g_up[i, :]
@@ -353,48 +358,63 @@ class LatticeQMC:
             Measured spin-down Green's function .math'G_\downarrow(\tau)' for all M time slices.
         """
         self.status = "Measurement"
-        n = self.model.n_sites
-        # Initialize total and temp greens functions
-        gf_up, gf_dn = 0, 0
+
         m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
-        g_beta_up = np.linalg.inv(m_up)
-        g_beta_dn = np.linalg.inv(m_dn)
-        g_tmp_up, g_tmp_dn = self._compute_gf_tau(g_beta_up, g_beta_dn)
+        # Initialize greens functions and help vectors
+        g_total_up = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
+        g_total_dn = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
+        g_up = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
+        g_dn = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
+        c_up = np.zeros(self.model.n_sites, dtype=np.float64)
+        c_dn = np.zeros(self.model.n_sites, dtype=np.float64)
 
         # QMC loop
-        number = 0
-        for sweep, i, l in self.loop_generator(self.meas_sweeps):
-            m_up, m_dn = self._compute_m()  # Calculate M matrices for both spins
-            arg = 2 * self.lamb * self.config[i, l]
+        for sweep in range(self.meas_sweeps):
+            g_up = np.linalg.inv(m_up)
+            g_dn = np.linalg.inv(m_dn)
+            # We start at time beta and go down
+            for l in reversed(range(self.time_steps)):
+                for i in range(self.n_sites):
+                    arg = 2 * self.lamb * self.config[i, l]
+                    d_up = 1 + (1 - g_up[i, i]) * (np.exp(-arg) - 1)
+                    d_dn = 1 + (1 - g_dn[i, i]) * (np.exp(+arg) - 1)
+                    ratio = d_up * d_dn
+                    acc = np.random.rand() < ratio
+                    if acc:
+                        # Update Greens function
+                        c_up = -(np.exp(-arg) - 1) * g_up[i, :]
+                        c_up[i] += (np.exp(-arg) - 1)
+                        c_dn = -(np.exp(+arg) - 1) * g_dn[i, :]
+                        c_dn[i] += (np.exp(+arg) - 1)
+                        # These are the bs in the tutorial, but I call them e
+                        # here to avoid confusing them with the B-matrices
+                        e_up = g_up[:, i] / (1 + c_up[i])
+                        e_dn = g_dn[:, i] / (1 + c_dn[i])
 
-            d_up = 1 + (1 - np.linalg.inv(m_up)[i, i]) * (np.exp(-arg) - 1)
-            d_dn = 1 + (1 - np.linalg.inv(m_dn)[i, i]) * (np.exp(+arg) - 1)
-            ratio = d_up * d_dn
-            acc = np.random.rand() < ratio
-            if acc:
-                # Move accepted: Update temp greens function and update configuration
-                c_up = np.zeros(n, dtype=np.float64)
-                c_dn = np.zeros(n, dtype=np.float64)
-                c_up[i] = np.exp(-arg) - 1
-                c_dn[i] = np.exp(+arg) - 1
-                c_up = -1 * (np.exp(-arg) - 1) * g_beta_up[i, :] + c_up
-                c_dn = -1 * (np.exp(+arg) - 1) * g_beta_dn[i, :] + c_dn
-                b_up = g_beta_up[:, i] / (1. + c_up[i])
-                b_dn = g_beta_dn[:, i] / (1. + c_dn[i])
+                        for j in range(self.n_sites):
+                            for k in range(self.n_sites):
+                                g_up[j, k] = g_up[j, k] - e_up[j] * c_up[k]
+                                g_dn[j, k] = g_dn[j, k] - e_dn[j] * c_dn[k]
+                        
+                        # Update HS-field
+                        self.config.update(i, l)
+                # Update the GF for the next time slice (Wrapping)
+                if l > 0: # Only do this, if this is not the last l-loop
+                    exp_v_up = self._exp_v(l - 1, +1)
+                    exp_v_dn = self._exp_v(l - 1, -1)
+                    b_up = np.dot(exp_v_up, self.exp_k)
+                    b_dn = np.dot(exp_v_dn, self.exp_k)
 
-                g_beta_up = g_beta_up - np.outer(b_up, c_up)
-                g_beta_dn = g_beta_dn - np.outer(b_dn, c_dn)
-                g_tmp_up, g_tmp_dn = self._compute_gf_tau(g_beta_up, g_beta_dn)
-
-                # Update Configuration
-                self.config.update(i, l)
-
-            # Add temp greens function to total gf after each step
-            gf_up += g_tmp_up
-            gf_dn += g_tmp_dn
-            number += 1
-        # Return the normalized gfs for each spin
-        return np.array([gf_up, gf_dn]) / number
+                    g_up = np.dot(np.dot(b_up, g_up), np.linalg.inv(b_up))
+                    g_dn = np.dot(np.dot(b_dn, g_dn), np.linalg.inv(b_dn))
+            # Perform measurements
+            g_total_up += g_up
+            g_total_dn += g_dn
+        # Return the normalized total green functions
+        g_total_up = g_total_up / self.meas_sweeps
+        g_total_dn = g_total_dn / self.meas_sweeps
+        # These are now separated, as we use them separated anyways
+        return g_total_up, g_total_dn
 
     def run_lqmc(self):
         if self.det_mode:
@@ -402,7 +422,7 @@ class LatticeQMC:
             gf_up, gf_dn = self.measure_loop_det()
         else:
             self.warmup_loop()
-            gf = self.measure_loop()
+            gf_up, gf_dn = self.measure_loop()
         return gf_up, gf_dn
 
     def run(self):
