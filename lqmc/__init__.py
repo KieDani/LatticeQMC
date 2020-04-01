@@ -10,5 +10,4 @@ from .lattice import Lattice
 from .configuration import Configuration
 from .hubbard import HubbardModel
 from .lqmc import LatticeQMC
-from .multiprocessing import LqmcProcess, LqmcProcessManager
 from .tools import *

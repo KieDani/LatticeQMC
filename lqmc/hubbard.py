@@ -34,7 +34,7 @@ class HubbardModel:
 
     def ham_kinetic(self):
         # Create hamiltonian with diagonal elements
-        energy = self.u/2 - self.mu
+        energy = -self.mu
         ham = energy * np.eye(self.lattice.n_sites, dtype=np.float64)
         # Add hopping terms
         # i is the index of the current site. The lattice

@@ -6,7 +6,38 @@ project: LatticeQMC
 version: 1.0
 """
 import numpy as np
-from .tools import Plot
+import matplotlib.pyplot as plt
+
+
+class Plot:
+
+    def __init__(self):
+        self.fig, self.ax = plt.subplots()
+
+    def set_limits(self, xlim=None, ylim=None):
+        if xlim is not None:
+            self.ax.set_xlim(*xlim)
+        if ylim is not None:
+            self.ax.set_ylim(*ylim)
+
+    def set_labels(self, xlabel=None, ylabel=None):
+        if xlabel is not None:
+            self.ax.set_xlabel(xlabel)
+        if ylabel is not None:
+            self.ax.set_ylabel(ylabel)
+
+    @staticmethod
+    def draw(pause=1e-10):
+        plt.draw()
+        plt.pause(pause)
+
+    @staticmethod
+    def show():
+        plt.show()
+
+    def autoscale(self):
+        self.ax.relim()
+        self.ax.autoscale()
 
 
 class ConfigStatPlot(Plot):

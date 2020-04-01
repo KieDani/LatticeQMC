@@ -4,7 +4,7 @@ Created on 03 Mar 2020
 author: Dylan Jones
 """
 import logging
-from logging import getLogger, INFO, DEBUG, WARNING
+from logging import getLogger, INFO, DEBUG, WARNING, ERROR
 
 FILE = "lqmc.log"
 

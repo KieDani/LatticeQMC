@@ -8,7 +8,7 @@ version: 1.0
 """
 import numpy as np
 from lqmc import HubbardModel
-from lqmc.gftools import pole_gf_tau
+from lqmc.tools import pole_gf_tau
 import matplotlib.pyplot as plt
 
 
