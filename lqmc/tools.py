@@ -127,3 +127,41 @@ def fermi_fct(eps, beta):
         The Fermi function, same type as eps.
     """
     return 0.5 * (1. + np.tanh(-0.5 * beta * eps))
+
+
+# =========================================================================
+#                               GF TOOLS
+# =========================================================================
+
+
+def decompose(a):
+    xi, rv = np.linalg.eigh(a)
+    return rv, xi, np.linalg.inv(rv)
+
+
+def reconstruct(rv, xi, rv_inv, diag=False):
+    if diag:
+        return ((np.transpose(rv_inv) * rv) @ xi[..., np.newaxis])[..., 0]
+    else:
+        return (rv * xi[..., np.newaxis, :]) @ rv_inv
+
+
+def pole_gf_tau(tau, poles, weights, beta):
+    assert np.all((tau >= 0.) & (tau <= beta))
+    poles, weights = np.atleast_1d(*np.broadcast_arrays(poles, weights))
+    tau = np.asanyarray(tau)
+    tau = tau.reshape(tau.shape + (1,)*poles.ndim)
+    # exp(-tau*pole)*f(-pole, beta) = exp((beta-tau)*pole)*f(pole, beta)
+    exponent = np.where(poles.real >= 0, -tau, beta-tau) * poles
+    single_pole_tau = np.exp(exponent) * fermi_fct(-np.sign(poles.real)*poles, beta)
+    return -np.sum(weights*single_pole_tau, axis=-1)
+
+
+def compute_pole_gf_tau(ham, beta):
+    rv, xi, rv_inv = decompose(ham)
+    tau = np.linspace(0, beta, num=2049)
+    # append axis, as we don't want the sum here
+    diag_gf_tau = pole_gf_tau(tau, xi[..., np.newaxis], weights=1, beta=beta)
+    gf_tau = reconstruct(rv, diag_gf_tau, rv_inv)
+    gf_tau = np.moveaxis(gf_tau, 0, -1)  # Convert to shape (site, site, tau)
+    return tau, gf_tau
