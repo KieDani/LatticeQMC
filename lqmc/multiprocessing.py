@@ -12,6 +12,15 @@ import multiprocessing
 from .lqmc import LatticeQMC
 
 
+def timestr(seconds):
+    mins, secs = divmod(seconds, 60)
+    if mins >= 60:
+        hours, mins = divmod(mins, 60)
+        return f'{int(hours):0>2}:{int(mins):0>2} h'
+    else:
+        return f'{int(mins):0>2}:{int(secs):0>2} min'
+
+
 class LqmcProcess(LatticeQMC, multiprocessing.Process):
 
     INDEX = itertools.count()
@@ -124,6 +133,10 @@ class ProcessManager:
     def free_processes(self):
         return self.max_procs - len(self.processes)
 
+    @property
+    def time(self):
+        return time.time() - self.t0
+
     def get_result(self):
         return np.array(self.result)
 
@@ -138,6 +151,14 @@ class ProcessManager:
         # Add Pending and done Processes
         prog += 1.0 * self.jobs_done
         return prog / self.total
+
+    def get_eta(self):
+        p = self.get_progress()
+        t = self.time
+        if not p:
+            return 0.0
+        else:
+            return (1 / p - 1) * t
 
     def join(self):
         for p in self.processes:
@@ -191,9 +212,11 @@ class ProcessManager:
         return []
 
     def update_str(self, *args, **kwargs):
-        info = f'Alive: {self.jobs_running}, Done: {self.jobs_done}, Pending: {self.jobs_pending}'
-        string = f'Progress: {100 * self.get_progress():5.1f}% ({info})'
-        return string
+        p = self.get_progress()
+        eta = self.get_eta()
+        string = f'Progress: {100 * p:5.1f}%, eta: {timestr(eta)}'
+        info = f' (Alive: {self.jobs_running}, Pending: {self.jobs_pending}, Done: {self.jobs_done})'
+        return string + info
 
     def update(self, *args):
         print('\r' + self.update_str(), end='', flush=True)
@@ -201,16 +224,16 @@ class ProcessManager:
 
     def end(self, *args):
         print()
-        mins, secs = divmod(time.time() - self.t0, 60)
-        print(f"Total time: {int(mins):0>2}:{int(secs):0>2} min")
+        print(f"Total time: {timestr(self.time)}")
 
     def run(self, sleep=0.5):
         self.t0 = time.time()
         args = self.start()
         while not self.all_done:
             self.handle_processes()
-            time.sleep(sleep)
             args = self.update(*args)
+            time.sleep(sleep)
+        args = self.update(*args)
         self.end(args)
 
 
@@ -270,6 +293,6 @@ class ParallelProcessManager(ProcessManager):
 
     def update(self, delim, width):
         row = self._frmt_items(self.iters, delim, width)
-        row += f'   Progress: {100 * self.get_progress():.1f}%'
+        row += f'   Progress: {100 * self.get_progress():.1f}%, eta: {timestr(self.get_eta())}'
         print(f"\r" + "Iteration     " + row, end="", flush=True)
         return delim, width
