@@ -346,11 +346,11 @@ class SerialProcessManager(ProcessManager):
             np.savez(self._tmp_file, beta=beta, data=data)
 
     def delete_cache(self, save=True):
-        if os.path.isfile(self.TMP_FILE):
+        if os.path.isfile(self._tmp_file):
             if save:
                 os.rename(self._tmp_file, self.file)
             else:
-                os.remove(self.TMP_FILE)
+                os.remove(self._tmp_file)
 
     def end(self, *args):
         super().end()
