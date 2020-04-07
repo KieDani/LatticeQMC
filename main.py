@@ -82,23 +82,60 @@ def measure_temps(model, temps, time_steps, warmup=500, sweeps=5000, cores=-1, d
 def main():
     # Model parameters
     n_sites = 5
-    u, t = 4, 1
-    temp = 4
+    u, t = 0.5, 1
+    temp = 1.5
     beta = 1 / temp
     # Simulation parameters
     time_steps = 15
     warmup = 500
     sweeps = 10000
-    cores = -1  # None to use all cores of the cpu
+    cores = None  # None to use all cores of the cpu
 
-    model = HubbardModel(u=u, t=t, mu=u / 2)
-    model.build(n_sites)
+    # model = HubbardModel(u=u, t=t, mu=u / 2)
+    # model.build(n_sites)
 
-    temps = np.arange(0.5, 10, step=0.5)
-    gf_data = measure_temps(model, temps, time_steps, warmup, sweeps, cores)
-    string = pfrmt_series(temps, gf_data)
-    print('-'*50)
-    print(string)
+    # temps = np.arange(0.5, 10, step=0.5)
+
+    # gf_data = measure_temps(model, temps, time_steps, warmup, sweeps, cores)
+
+    # string = pfrmt_series(temps, gf_data)
+    # print('-'*50)
+    # print(string)
+
+
+    # gf_data = measure(model, beta, time_steps, warmup, sweeps, cores=cores, det_mode=True)
+
+    # gf_up, gf_dn = gf_data
+    # filling_up = 1 - np.diagonal(gf_up)
+    # filling_dn = 1 - np.diagonal(gf_dn)
+    # filling_average = np.sum(filling_dn) + np.sum(filling_up)
+    # filling_average = filling_average / (filling_dn.shape[0] * 2)
+    # print(str(temp) + ' --- ' + str(filling_average))
+    # print(temp)
+    # print(filling_up)
+    # print(filling_dn)
+
+
+    for U in [0.5, 1, 2, 4, 6, 8, 10, 12]:
+        model = HubbardModel(u=U, t=t, mu=U / 2)
+        model.build(n_sites)
+
+        temps = np.asarray([1.5, 2., 2.5, 3., 3.5, 4., 4.5, 5., 6., 7., 8., 9., 10., 12., 14., 17., 20.])
+
+        gf_data = measure_temps(model, temps, time_steps, warmup, sweeps, cores)
+
+        with open("E:\\Download\\5.Semester\\Computational_Physics\\project\\U=" + str(U), mode='w') as f:
+            for i, temp in enumerate(temps):
+                gf_up, gf_dn = gf_data[i]
+                filling_up = 1 - np.diagonal(gf_up)
+                filling_dn = 1 - np.diagonal(gf_dn)
+                filling_average = np.sum(filling_dn) + np.sum(filling_up)
+                filling_average = filling_average / (filling_dn.shape[0] * 2)
+                print(str(temp) + ',' + str(filling_average), file=f)
+
+        string = pfrmt_series(temps, gf_data)
+        print('-'*50)
+        print(string)
 
     # gf_up, gf_dn = measure(model, beta, time_steps, warmup, sweeps, cores=cores)
     # print_result(gf_up, gf_dn)
