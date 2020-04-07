@@ -9,26 +9,33 @@ import os
 import numpy as np
 
 
-def _get_filepath(model, beta, time_steps, sweeps):
-    """ Creates the file path for the given parameters"""
+def get_datapath(filename, model, post='', mkdir=True, **kwargs):
+    """ Creates the file path for the given parameters
+
+    Parameters
+    ----------
+    filename: str
+        Name of the file.
+    model: HubbardModel
+        Instance of the 'HubbardModel'-object used.
+    post: str, optional
+        Optional string to append to the final path (before the file extension).
+        This is used for creating tmp-files (<name>_tmp.ext)
+    mkdir: bool, optional
+        Flag if the directory path of the file should be created. The default is True.
+    **kwargs
+        Optional keyword arguments of parameters used in the filepath.
+
+    Returns
+    -------
+    path: str
+    """
     w, h = model.lattice.shape
     folder = os.path.join("data", f"u={model.u}_t={model.t}_mu={model.mu}_w={w}_h={h}")
-    file = f"gf_itau__beta={beta}_nt={time_steps}_sweeps={sweeps}.npy"
-    return os.path.abspath(os.path.join(folder, file))
-
-
-def save_gf_tau(model, beta, time_steps, sweeps, gf):
-    """ Save imaginary time depended Green's function measurement data into the tree """
-    file = _get_filepath(model, beta, time_steps, sweeps)
-    if not os.path.isdir(os.path.dirname(file)):
-        os.makedirs(os.path.dirname(file))
-    np.save(file, gf)
-
-
-def load_gf_tau(model, beta, time_steps, sweeps):
-    """ Load imaginary time depended Green's function measurement data """
-    file = _get_filepath(model, beta, time_steps, sweeps)
-    return np.load(file)
+    if mkdir and not os.path.isdir(folder):
+        os.makedirs(folder)
+    kwargstr = '_'.join([f'{key}={val}' for key, val in kwargs.items()])
+    return os.path.abspath(os.path.join(folder, f"{filename} {kwargstr}{post}.npz"))
 
 
 def check_params(u, t, dtau):

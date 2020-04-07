@@ -5,11 +5,13 @@ Created on 16 Jan 2020
 project: LatticeQMC
 version: 1.0
 """
+import os
 import time
 import numpy as np
 import itertools
 import multiprocessing
 from .lqmc import LatticeQMC
+from .tools import get_datapath
 
 
 def timestr(seconds):
@@ -84,13 +86,17 @@ class ProcessManager:
         self.var_kwargs = dict()
         self.t0 = 0
 
+    @property
+    def model(self):
+        return self.default_kwargs['model']
+
     def set_jobs(self, **kwargs):
         """ Sets the jobs of the process manager.
 
         Parameters
         ----------
         **kwargs
-            The variable arguments for the `LatticeQMC`-object. which will be added
+            The variable arguments for the `LatticeQMC`-object, which will be added
             to the default arguments. Each value must be an array-like object
             contain the same number of parameters, one for each job.
         """
@@ -168,7 +174,7 @@ class ProcessManager:
         for p in self.processes:
             p.terminate()
 
-    def _start_process(self):
+    def start_process(self):
         # Get next index
         self.lock.acquire()
         idx = self.idx
@@ -186,21 +192,25 @@ class ProcessManager:
         # Start the new process
         p.start()
 
+    def end_process(self, item):
+        p, pipe = item
+        idx = p.idx
+        data = pipe.recv()
+        self.result[idx] = np.array(data)
+        self.lock.acquire()
+        self.processes.remove(item)
+        self.lock.release()
+
     def handle_processes(self):
         # Check for finished processes and store the data in result
         for item in self.processes:
-            p, pipe = item
+            p = item[0]
             if p.is_done():
-                idx = p.idx
-                data = pipe.recv()
-                self.result[idx] = np.array(data)
-                self.lock.acquire()
-                self.processes.remove(item)
-                self.lock.release()
+                self.end_process(item)
 
         # Check if jobs are left and start new processes
         while self.jobs_pending and self.free_processes:
-            self._start_process()
+            self.start_process()
 
     def start_str(self, *args, **kwargs):
         return f'Starting {self}'
@@ -219,7 +229,7 @@ class ProcessManager:
         return string + info
 
     def update(self, *args):
-        print('\r' + self.update_str(), end='', flush=True)
+        print(f'\r{self.update_str():<80}', end='', flush=True)
         return args
 
     def end(self, *args):
@@ -238,24 +248,6 @@ class ProcessManager:
 
 
 # =========================================================================
-
-
-class SerialProcessManager(ProcessManager):
-
-    CORE_COUNT = multiprocessing.cpu_count()
-
-    def __init__(self, model, time_steps, warmup=300, sweeps=2000, det_mode=False, procs=None):
-        super().__init__(procs, model=model, time_steps=time_steps,
-                         warmup=warmup, sweeps=sweeps, det_mode=det_mode)
-
-    def set_jobs(self, betas):
-        super().set_jobs(beta=betas)
-
-    def start_str(self, *args, **kwargs):
-        string = super().start_str()
-        string += f"\nWarmup     ={self.default_kwargs['warmup']}"
-        string += f"\nMeasurement={self.default_kwargs['sweeps']}"
-        return string
 
 
 class ParallelProcessManager(ProcessManager):
@@ -296,3 +288,70 @@ class ParallelProcessManager(ProcessManager):
         row += f'   Progress: {100 * self.get_progress():.1f}%, eta: {timestr(self.get_eta())}'
         print(f"\r" + "Iteration     " + row, end="", flush=True)
         return delim, width
+
+
+class SerialProcessManager(ProcessManager):
+
+    CORE_COUNT = multiprocessing.cpu_count()
+    TMP_FILE = 'tmp_data.npz'
+
+    def __init__(self, model, time_steps, warmup=300, sweeps=2000, det_mode=False, procs=None, caching=True):
+        super().__init__(procs, model=model, time_steps=time_steps,
+                         warmup=warmup, sweeps=sweeps, det_mode=det_mode)
+        self.caching = caching
+        self.file = self._get_filepath('gf_series')
+        self._tmp_file = self._get_filepath('gf_series', '_tmp')
+
+    def set_jobs(self, betas):
+        super().set_jobs(beta=betas)
+
+    def _get_filepath(self, name='gf', post=''):
+        model = self.default_kwargs['model']
+        nt = self.default_kwargs['time_steps']
+        warmup = self.default_kwargs['warmup']
+        sweeps = self.default_kwargs['sweeps']
+        return get_datapath(name, model, post, nt=nt, warm=warmup, meas=sweeps)
+
+    def load_data(self):
+        data = np.load(self.file, allow_pickle=True)
+        return data['beta'], data['data']
+
+    def start_str(self, *args, **kwargs):
+        string = super().start_str()
+        string += f"\nWarmup     ={self.default_kwargs['warmup']}"
+        string += f"\nMeasurement={self.default_kwargs['sweeps']}"
+        return string
+
+    def start(self):
+        args = super().start()
+        if self.caching and os.path.isfile(self._tmp_file):
+            # Load cached result and and continue computation
+            data = np.load(self._tmp_file, allow_pickle=True)
+            result = list(data['data'])
+            self.result = list(result)
+            next_idx = 0
+            for next_idx, el in enumerate(self.result):
+                if el is None:
+                    break
+            self.idx = next_idx
+            print(f'Found temporary data. Continuing at job {self.idx}...')
+        return args
+
+    def end_process(self, item):
+        super().end_process(item)
+        if self.caching:
+            # Save current state of the results to file
+            beta = self.var_kwargs['beta']
+            data = self.get_result()
+            np.savez(self._tmp_file, beta=beta, data=data)
+
+    def delete_cache(self, save=True):
+        if os.path.isfile(self.TMP_FILE):
+            if save:
+                os.rename(self._tmp_file, self.file)
+            else:
+                os.remove(self.TMP_FILE)
+
+    def end(self, *args):
+        super().end()
+        self.delete_cache()
