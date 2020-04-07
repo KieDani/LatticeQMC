@@ -60,27 +60,53 @@ def check_params(u, t, dtau):
         print(f"Check-value {check_val:.2} should be smaller than 0.1!")
 
 
-def filling(g_sigma):
+def filling(g_sigma, site=None, axis1=-2, axis2=-1):
     r""" Computes the local filling of the model.
 
     Parameters
     ----------
-    g_sigma: (N, N) np.ndarray
+    g_sigma: (..., N, N) np.ndarray
         Green's function .math'G_{\sigma}' of a spin channel.
+    site: int, optional
+        Site index. If not given the whole array is returned.
+    axis1: int, optional
+        The first axis of the gf-matrix. By default the last two axes are used.
+    axis2: int, optional
+        The second axis of the gf-matrix. By default the last two axes are used.
 
     Returns
     -------
-    n: (N) np.ndarray
+    n: (..., N) np.ndarray
     """
-    return 1 - np.diagonal(g_sigma)
+    n = 1 - np.diagonal(g_sigma, axis1=axis1, axis2=axis2)
+    if site is not None:
+        n = n[..., site]
+    return n
 
 
-def print_filling(gf_up, gf_dn):
-    n_up = filling(gf_up)
-    n_dn = filling(gf_dn)
-    print(f"<n↑> = {np.mean(n_up):.3f}  {n_up}")
-    print(f"<n↓> = {np.mean(n_dn):.3f}  {n_dn}")
-    print(f"<n>  = {np.mean(n_up + n_dn):.3f}")
+def local_moment(gf_up, gf_dn, site=None, axis1=-2, axis2=-1):
+    r""" Computes the local moment of the model.
+
+    Parameters
+    ----------
+    gf_up: (..., N, N) np.ndarray
+        Spin-up Green's function .math'G_{\uparrow}'.
+    gf_dn: (..., N, N) np.ndarray
+        Spin-down Green's function .math'G_{\downarrow}'.
+    site: int, optional
+        Site index. If not given the whole array is returned.
+    axis1: int, optional
+        The first axis of the gf-matrix. By default the last two axes are used.
+    axis2: int, optional
+        The second axis of the gf-matrix. By default the last two axes are used.
+
+    Returns
+    -------
+    m: float or np.ndarray
+    """
+    n_up = filling(gf_up, site, axis1, axis2)
+    n_dn = filling(gf_dn, site, axis1, axis2)
+    return n_up + n_dn - 2 * n_up * n_dn
 
 
 def local_gf(gf):
