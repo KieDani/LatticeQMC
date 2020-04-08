@@ -8,7 +8,7 @@ version: 1.0
 """
 import numpy as np
 from lqmc import HubbardModel
-from lqmc.tools import pole_gf_tau
+from lqmc.tools import pole_gf_tau, compute_pole_gf_tau
 import matplotlib.pyplot as plt
 
 
@@ -42,9 +42,9 @@ def main():
     beta = 1 / temp
 
     model = HubbardModel(u=u, t=t, mu=u / 2)
-    model.build(n_sites, cycling=False)
+    model.build(n_sites, cycling=None)
     ham = model.ham_kinetic()
-    tau, gf_tau = noninter_gf(ham, beta)
+    tau, gf_tau = compute_pole_gf_tau(ham, beta)
 
     fig, ax = plt.subplots()
     for site in range(model.n_sites):
