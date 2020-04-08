@@ -29,6 +29,23 @@ class HubbardModel:
         self.t = t
         self.mu = mu if mu is not None else u/2
 
+    def set_params(self, u, t=1.0, mu=None):
+        """ Sets the parameters of the Hubbard model.
+
+        Parameters
+        ----------
+        u: float, optional
+            Interaction energy of the Hubbard model.
+        t: float, optional
+            Hopping energy of the Hubbard model.
+        mu: float, optional
+            Chemical potential of the Hubbard model.
+            If `None` the chemical potential is set to ensure half filling.
+        """
+        self.u = u
+        self.t = t
+        self.mu = mu if mu is not None else u/2
+
     def param_str(self):
         return f"u={self.u}_t={self.t}_mu={self.mu}"
 
