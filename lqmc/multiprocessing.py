@@ -11,7 +11,6 @@ import numpy as np
 import itertools
 import multiprocessing
 from .lqmc import LatticeQMC
-from .tools import get_datapath
 
 
 def timestr(seconds):
@@ -299,22 +298,10 @@ class SerialProcessManager(ProcessManager):
         super().__init__(procs, model=model, time_steps=time_steps,
                          warmup=warmup, sweeps=sweeps, det_mode=det_mode)
         self.caching = caching
-        self.file = self._get_filepath('gf_series')
-        self._tmp_file = self._get_filepath('gf_series', '_tmp')
+        self._tmp_file = 'tmp_gf_series.npz'
 
     def set_jobs(self, betas):
         super().set_jobs(beta=betas)
-
-    def _get_filepath(self, name='gf', post=''):
-        model = self.default_kwargs['model']
-        nt = self.default_kwargs['time_steps']
-        warmup = self.default_kwargs['warmup']
-        sweeps = self.default_kwargs['sweeps']
-        return get_datapath(name, model, post, nt=nt, warm=warmup, meas=sweeps)
-
-    def load_data(self):
-        data = np.load(self.file, allow_pickle=True)
-        return data['beta'], data['data']
 
     def start_str(self, *args, **kwargs):
         string = super().start_str()
@@ -345,12 +332,9 @@ class SerialProcessManager(ProcessManager):
             data = self.get_result()
             np.savez(self._tmp_file, beta=beta, data=data)
 
-    def delete_cache(self, save=True):
+    def delete_cache(self):
         if os.path.isfile(self._tmp_file):
-            if save:
-                os.rename(self._tmp_file, self.file)
-            else:
-                os.remove(self._tmp_file)
+            os.remove(self._tmp_file)
 
     def end(self, *args):
         super().end()
