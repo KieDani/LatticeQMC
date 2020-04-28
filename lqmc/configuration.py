@@ -6,47 +6,122 @@ project: LatticeQMC
 version: 1.0
 """
 import numpy as np
+import matplotlib.pyplot as plt
+
+
+class Plot:
+
+    def __init__(self):
+        self.fig, self.ax = plt.subplots()
+
+    def set_limits(self, xlim=None, ylim=None):
+        if xlim is not None:
+            self.ax.set_xlim(*xlim)
+        if ylim is not None:
+            self.ax.set_ylim(*ylim)
+
+    def set_labels(self, xlabel=None, ylabel=None):
+        if xlabel is not None:
+            self.ax.set_xlabel(xlabel)
+        if ylabel is not None:
+            self.ax.set_ylabel(ylabel)
+
+    @staticmethod
+    def draw(pause=1e-10):
+        plt.draw()
+        plt.pause(pause)
+
+    @staticmethod
+    def show():
+        plt.show()
+
+    def autoscale(self):
+        self.ax.relim()
+        self.ax.autoscale()
+
+
+class ConfigStatPlot(Plot):
+
+    def __init__(self, xlabel="Sweeps"):
+        super().__init__()
+        self.ax.set_xlabel(xlabel)
+        self.mean = None
+        self.var = None
+        self.x = list()
+
+    @classmethod
+    def empty(cls, xlabel="Sweeps"):
+        self = cls(xlabel)
+        self.plot([], [])
+        return self
+
+    def plot(self, mean, var):
+        self.x = list(range(len(mean)))
+        self.mean = self.ax.plot(self.x, mean, label="MC Mean")[0]
+        self.var = self.ax.plot(self.x, var, label="MC Var")[0]
+        self.ax.legend()
+        self.ax.grid()
+
+    def update(self, mean, var):
+        self.x.append(len(self.x))
+        self.mean.set_data(self.x, np.append(self.mean.get_ydata(), mean))
+        self.var.set_data(self.x, np.append(self.var.get_ydata(), var))
+        self.autoscale()
+
+
+class ConfigPlot(Plot):
+
+    def __init__(self, config):
+        super().__init__()
+        self.im = self.ax.matshow(config.config.T, cmap="binary")
+        self.ax.xaxis.tick_bottom()
+        self.ax.invert_yaxis()
+        self.ax.set_xlabel("Sites")
+        self.ax.set_ylabel(r"$\tau$")
+
+    def update(self, config):
+        self.im.set_data(config.config.T)
 
 
 class Configuration:
-    """ Configuration class representing the hubbard-Stratonovich (HS) field."""
+    """ Configuration class representing the Hubbard-Stratonovich (HS) field."""
 
-    def __init__(self, n, time_steps):
+    dtype = np.int8
+
+    def __init__(self, n_sites, time_steps, array=None):
         """ Constructor of the Configuration class
 
         Parameters
         ----------
-        n: int
+        n_sites: int
             Number of spatial lattice sites.
         time_steps: int
             Number of time slices (per site).
+        array: np.ndarray of np.int8, optional
+            Existing configuration to use.
         """
-        self.n = n
+        self.n_sites = n_sites
         self.time_steps = time_steps
-        self.config = np.zeros((n, time_steps), dtype=np.int8)
-        self.initialize()
-
-    @property
-    def dtype(self):
-        return self.config.dtype
+        self.config = np.ndarray
+        if array is not None:
+            self.config = array
+        else:
+            self.initialize()
 
     def copy(self):
-        """ Copies the configuration instance
+        """ Creates a (deep) copy of the 'Configuration' instance
 
         Returns
         -------
         config: Configuration
         """
-        config = Configuration(self.n, self.time_steps)
-        config.config = np.copy(self.config)
-        return config
+        return Configuration(self.n_sites, self.time_steps, array=self.config.copy())
 
     def initialize(self):
         """ Initializes the configuration with a random distribution of -1 and +1 """
-        # Create an array of random 0 and 1.
-        config = np.random.randint(0, 2, size=(self.n, self.time_steps))
-        # Scale array to -1 and 1
-        self.config = 2*config - 1
+        # Create an array of random 0 and 1 and scale array to -1 and 1
+        config = 2 * np.random.randint(0, 2, size=(self.n_sites, self.time_steps)) - 1
+        self.config = config.astype(self.dtype)
 
     def update(self, i, t):
         """ Update element of array by flipping its spin-value
@@ -60,12 +135,8 @@ class Configuration:
         """
         self.config[i, t] *= -1
 
-    def get(self):
-        """ (n, m) np.ndarray: Spin-configuration"""
-        return self.config
-
-    def get_element(self, i, t):
-        """ Return a element of the array
+    def get(self, i, t):
+        """ Returns a specific element of the configuration
 
         Parameters
         ----------
@@ -80,10 +151,38 @@ class Configuration:
         """
         return self.config[i, t]
 
+    def mean(self):
+        """ float: Computes the Monte-Carlo sample mean """
+        return np.mean(self.config)
+
+    def var(self):
+        """ float: Computes the Monte-Carlo sample variance """
+        return np.var(self.config)
+
+    def __eq__(self, other):
+        return np.all(self.config == other.config)
+
     def __getitem__(self, item):
         return self.config[item]
 
+    def string_header(self, delim=" "):
+        return r"i\l  " + delim.join([f"{i:^3}" for i in range(self.time_steps)])
+
+    def string_bulk(self, delim=" "):
+        rows = list()
+        for site in range(self.n_sites):
+            row = delim.join([f"{x:^3}" for x in self.config[site, :]])
+            rows.append(f"{site:<3} [{row}]")
+        return "\n".join(rows)
+
     def __str__(self):
-        return str(self.config.T)
+        delim = " "
+        string = self.string_header(delim) + "\n"
+        string += self.string_bulk(delim)
+        return string
 
-
+    def show(self, show=True):
+        plot = ConfigPlot(self)
+        if show:
+            plot.show()
+        return plot
